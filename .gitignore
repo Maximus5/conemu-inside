@@ -1,0 +1,6 @@
+_*.sln
+*.exe
+bin
+obj
+*.user
+.vs
