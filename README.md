@@ -2,6 +2,8 @@
 This is an example, how [ConEmu-Maximus5](https://conemu.github.io)
 may be embedded into third-party graphical applications.
 
+ConEmu build 151201 or higher is required.
+
 
 ## Screenshots
 ![ConEmu Inside](https://github.com/Maximus5/conemu-inside/wiki/ConEmu-Inside.png)
