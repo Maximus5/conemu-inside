@@ -3,11 +3,8 @@
 	<key name="ConEmu">
 		<key name=".Vanilla" modified="2015-12-01 17:14:51" build="151129">
 			<value name="StartType" type="hex" data="02"/>
-			<value name="CmdLine" type="string" data=""/>
-			<value name="StartTasksFile" type="string" data=""/>
 			<value name="StartTasksName" type="string" data="{Shells::cmd}"/>
-			<value name="StartFarFolders" type="hex" data="00"/>
-			<value name="StartFarEditors" type="hex" data="00"/>
+			<value name="Tabs" type="hex" data="00"/>
 			<value name="SingleInstance" type="hex" data="00"/>
 			<value name="KeyboardHooks" type="hex" data="01"/>
 			<value name="UseInjects" type="hex" data="01"/>
