@@ -66,34 +66,34 @@ namespace ConEmuInside
             string ConEmuC = GetConEmuC();
             if (ConEmuC != null)
             {
-            	ProcessStartInfo macro = new ProcessStartInfo(
-            		ConEmuC,
-            		" -GuiMacro:" + ConEmu.Id.ToString() + 
-                    " " +
-                    asMacro
-	                );
+                ProcessStartInfo macro = new ProcessStartInfo(
+                   ConEmuC,
+                   " -GuiMacro:" + ConEmu.Id.ToString() +
+                     " " +
+                     asMacro
+                    );
                 macro.WindowStyle = ProcessWindowStyle.Hidden;
                 macro.CreateNoWindow = true;
-            	Process.Start(macro);
+                Process.Start(macro);
             }
         }
 
         private void printBtn_Click(object sender, EventArgs e)
         {
-        	if (textBox1.Text == "")
-        		return;
+            if (promptBox.Text == "")
+                return;
             String lsMacro;
-            lsMacro = "Print(@\"" + textBox1.Text.Replace("\"", "\"\"") + "\",\"\n\")";
+            lsMacro = "Print(@\"" + promptBox.Text.Replace("\"", "\"\"") + "\",\"\n\")";
             ExecuteGuiMacro(lsMacro);
-            textBox1.SelectAll();
+            promptBox.SelectAll();
         }
 
         private void macroBtn_Click(object sender, EventArgs e)
         {
-        	if (textBox1.Text == "")
-        		return;
-            ExecuteGuiMacro(textBox1.Text);
-            textBox1.SelectAll();
+            if (promptBox.Text == "")
+                return;
+            ExecuteGuiMacro(promptBox.Text);
+            promptBox.SelectAll();
         }
 
         private void timer1_Tick(object sender, EventArgs e)
@@ -102,15 +102,32 @@ namespace ConEmuInside
             {
                 timer1.Stop();
                 ConEmu = null;
+                RefreshControls(false);
             }
         }
 
-        private void textBox1_KeyDown(object sender, KeyEventArgs e)
+        private void promptBox_KeyDown(object sender, KeyEventArgs e)
         {
+            //TODO: Enter and Leave events are not triggered when focus is put into ConEmu window
             if (e.KeyValue == 13)
             {
                 printBtn_Click(sender, null);
             }
+        }
+
+        private void promptBox_Enter(object sender, EventArgs e)
+        {
+            //TODO: Enter and Leave events are not triggered when focus is put into ConEmu window
+            //AcceptButton = printBtn;
+            //promptBox.Text = "...in...";
+        }
+
+        private void promptBox_Leave(object sender, EventArgs e)
+        {
+            //TODO: Enter and Leave events are not triggered when focus is put into ConEmu window
+            //if (AcceptButton == printBtn)
+            //AcceptButton = null;
+            //promptBox.Text = "...out...";
         }
     }
 }
