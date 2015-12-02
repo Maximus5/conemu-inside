@@ -30,7 +30,6 @@
         {
             this.components = new System.ComponentModel.Container();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
-            this.termPanel = new System.Windows.Forms.Panel();
             this.startPanel = new System.Windows.Forms.Panel();
             this.label4 = new System.Windows.Forms.Label();
             this.xmlBtn = new System.Windows.Forms.Button();
@@ -46,6 +45,7 @@
             this.label2 = new System.Windows.Forms.Label();
             this.argConEmuExe = new System.Windows.Forms.TextBox();
             this.label1 = new System.Windows.Forms.Label();
+            this.termPanel = new System.Windows.Forms.Panel();
             this.groupBox2 = new System.Windows.Forms.GroupBox();
             this.macroBtn = new System.Windows.Forms.Button();
             this.printBtn = new System.Windows.Forms.Button();
@@ -63,25 +63,14 @@
             this.groupBox1.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.groupBox1.Controls.Add(this.termPanel);
             this.groupBox1.Controls.Add(this.startPanel);
+            this.groupBox1.Controls.Add(this.termPanel);
             this.groupBox1.Location = new System.Drawing.Point(12, 12);
             this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Size = new System.Drawing.Size(582, 338);
+            this.groupBox1.Size = new System.Drawing.Size(576, 355);
             this.groupBox1.TabIndex = 0;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "Terminal";
-            // 
-            // termPanel
-            // 
-            this.termPanel.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.termPanel.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(43)))), ((int)(((byte)(54)))));
-            this.termPanel.Location = new System.Drawing.Point(6, 19);
-            this.termPanel.Name = "termPanel";
-            this.termPanel.Size = new System.Drawing.Size(570, 313);
-            this.termPanel.TabIndex = 0;
             // 
             // startPanel
             // 
@@ -102,9 +91,9 @@
             this.startPanel.Controls.Add(this.label2);
             this.startPanel.Controls.Add(this.argConEmuExe);
             this.startPanel.Controls.Add(this.label1);
-            this.startPanel.Location = new System.Drawing.Point(20, 17);
+            this.startPanel.Location = new System.Drawing.Point(9, 17);
             this.startPanel.Name = "startPanel";
-            this.startPanel.Size = new System.Drawing.Size(543, 158);
+            this.startPanel.Size = new System.Drawing.Size(558, 158);
             this.startPanel.TabIndex = 0;
             this.startPanel.Text = "Start parameters";
             // 
@@ -120,7 +109,7 @@
             // xmlBtn
             // 
             this.xmlBtn.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.xmlBtn.Location = new System.Drawing.Point(510, 97);
+            this.xmlBtn.Location = new System.Drawing.Point(525, 97);
             this.xmlBtn.Name = "xmlBtn";
             this.xmlBtn.Size = new System.Drawing.Size(24, 21);
             this.xmlBtn.TabIndex = 13;
@@ -131,15 +120,16 @@
             // 
             this.argXmlFile.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.argXmlFile.Location = new System.Drawing.Point(133, 97);
+            this.argXmlFile.Location = new System.Drawing.Point(117, 97);
             this.argXmlFile.Name = "argXmlFile";
-            this.argXmlFile.Size = new System.Drawing.Size(371, 20);
+            this.argXmlFile.Size = new System.Drawing.Size(402, 20);
             this.argXmlFile.TabIndex = 12;
             this.argXmlFile.Enter += new System.EventHandler(this.startArgs_Enter);
             // 
             // startBtn
             // 
-            this.startBtn.Location = new System.Drawing.Point(335, 124);
+            this.startBtn.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.startBtn.Location = new System.Drawing.Point(350, 123);
             this.startBtn.Name = "startBtn";
             this.startBtn.Size = new System.Drawing.Size(169, 23);
             this.startBtn.TabIndex = 11;
@@ -150,7 +140,7 @@
             // dirBtn
             // 
             this.dirBtn.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.dirBtn.Location = new System.Drawing.Point(510, 70);
+            this.dirBtn.Location = new System.Drawing.Point(525, 70);
             this.dirBtn.Name = "dirBtn";
             this.dirBtn.Size = new System.Drawing.Size(24, 21);
             this.dirBtn.TabIndex = 10;
@@ -161,7 +151,7 @@
             // cmdBtn
             // 
             this.cmdBtn.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.cmdBtn.Location = new System.Drawing.Point(510, 45);
+            this.cmdBtn.Location = new System.Drawing.Point(525, 45);
             this.cmdBtn.Name = "cmdBtn";
             this.cmdBtn.Size = new System.Drawing.Size(24, 21);
             this.cmdBtn.TabIndex = 9;
@@ -172,7 +162,7 @@
             // exeBtn
             // 
             this.exeBtn.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.exeBtn.Location = new System.Drawing.Point(510, 18);
+            this.exeBtn.Location = new System.Drawing.Point(525, 18);
             this.exeBtn.Name = "exeBtn";
             this.exeBtn.Size = new System.Drawing.Size(24, 21);
             this.exeBtn.TabIndex = 8;
@@ -183,7 +173,7 @@
             // argRunAs
             // 
             this.argRunAs.AutoSize = true;
-            this.argRunAs.Location = new System.Drawing.Point(133, 128);
+            this.argRunAs.Location = new System.Drawing.Point(117, 128);
             this.argRunAs.Name = "argRunAs";
             this.argRunAs.Size = new System.Drawing.Size(123, 17);
             this.argRunAs.TabIndex = 7;
@@ -194,9 +184,9 @@
             // 
             this.argDirectory.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.argDirectory.Location = new System.Drawing.Point(133, 71);
+            this.argDirectory.Location = new System.Drawing.Point(117, 71);
             this.argDirectory.Name = "argDirectory";
-            this.argDirectory.Size = new System.Drawing.Size(371, 20);
+            this.argDirectory.Size = new System.Drawing.Size(402, 20);
             this.argDirectory.TabIndex = 6;
             this.argDirectory.Enter += new System.EventHandler(this.startArgs_Enter);
             // 
@@ -204,9 +194,9 @@
             // 
             this.argCmdLine.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.argCmdLine.Location = new System.Drawing.Point(133, 45);
+            this.argCmdLine.Location = new System.Drawing.Point(117, 45);
             this.argCmdLine.Name = "argCmdLine";
-            this.argCmdLine.Size = new System.Drawing.Size(371, 20);
+            this.argCmdLine.Size = new System.Drawing.Size(402, 20);
             this.argCmdLine.TabIndex = 5;
             this.argCmdLine.Text = "{cmd}";
             this.argCmdLine.Enter += new System.EventHandler(this.startArgs_Enter);
@@ -233,9 +223,9 @@
             // 
             this.argConEmuExe.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.argConEmuExe.Location = new System.Drawing.Point(133, 19);
+            this.argConEmuExe.Location = new System.Drawing.Point(117, 19);
             this.argConEmuExe.Name = "argConEmuExe";
-            this.argConEmuExe.Size = new System.Drawing.Size(371, 20);
+            this.argConEmuExe.Size = new System.Drawing.Size(402, 20);
             this.argConEmuExe.TabIndex = 1;
             this.argConEmuExe.Text = "ConEmu.exe";
             this.argConEmuExe.Enter += new System.EventHandler(this.startArgs_Enter);
@@ -249,6 +239,17 @@
             this.label1.TabIndex = 0;
             this.label1.Text = "ConEmu executable:";
             // 
+            // termPanel
+            // 
+            this.termPanel.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.termPanel.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(43)))), ((int)(((byte)(54)))));
+            this.termPanel.Location = new System.Drawing.Point(6, 19);
+            this.termPanel.Name = "termPanel";
+            this.termPanel.Size = new System.Drawing.Size(564, 330);
+            this.termPanel.TabIndex = 0;
+            // 
             // groupBox2
             // 
             this.groupBox2.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
@@ -256,9 +257,9 @@
             this.groupBox2.Controls.Add(this.macroBtn);
             this.groupBox2.Controls.Add(this.printBtn);
             this.groupBox2.Controls.Add(this.promptBox);
-            this.groupBox2.Location = new System.Drawing.Point(12, 356);
+            this.groupBox2.Location = new System.Drawing.Point(12, 373);
             this.groupBox2.Name = "groupBox2";
-            this.groupBox2.Size = new System.Drawing.Size(582, 48);
+            this.groupBox2.Size = new System.Drawing.Size(576, 48);
             this.groupBox2.TabIndex = 1;
             this.groupBox2.TabStop = false;
             this.groupBox2.Text = "Controlling box";
@@ -266,7 +267,7 @@
             // macroBtn
             // 
             this.macroBtn.Anchor = System.Windows.Forms.AnchorStyles.Right;
-            this.macroBtn.Location = new System.Drawing.Point(501, 17);
+            this.macroBtn.Location = new System.Drawing.Point(495, 17);
             this.macroBtn.Name = "macroBtn";
             this.macroBtn.Size = new System.Drawing.Size(75, 23);
             this.macroBtn.TabIndex = 2;
@@ -277,7 +278,7 @@
             // printBtn
             // 
             this.printBtn.Anchor = System.Windows.Forms.AnchorStyles.Right;
-            this.printBtn.Location = new System.Drawing.Point(420, 17);
+            this.printBtn.Location = new System.Drawing.Point(414, 17);
             this.printBtn.Name = "printBtn";
             this.printBtn.Size = new System.Drawing.Size(75, 23);
             this.printBtn.TabIndex = 1;
@@ -290,7 +291,7 @@
             this.promptBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this.promptBox.Location = new System.Drawing.Point(6, 19);
             this.promptBox.Name = "promptBox";
-            this.promptBox.Size = new System.Drawing.Size(408, 20);
+            this.promptBox.Size = new System.Drawing.Size(402, 20);
             this.promptBox.TabIndex = 0;
             this.promptBox.Enter += new System.EventHandler(this.promptBox_Enter);
             this.promptBox.KeyDown += new System.Windows.Forms.KeyEventHandler(this.promptBox_KeyDown);
@@ -315,7 +316,7 @@
             this.AcceptButton = this.startBtn;
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(606, 416);
+            this.ClientSize = new System.Drawing.Size(600, 433);
             this.Controls.Add(this.groupBox2);
             this.Controls.Add(this.groupBox1);
             this.MinimumSize = new System.Drawing.Size(400, 300);
