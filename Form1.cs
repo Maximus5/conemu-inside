@@ -233,23 +233,35 @@ namespace ConEmuInside
 
         private void startBtn_Click(object sender, EventArgs e)
         {
-            string sRunAs;
+            string sRunAs, sRunArgs;
 
             // Show terminal panel, hide start options
-            RefreshControls(true);
+            //RefreshControls(true);
 
             sRunAs = argRunAs.Checked ? " -cur_console:a" : "";
 
-            ConEmu = Process.Start(argConEmuExe.Text,
+            sRunArgs =
                 " -InsideWnd 0x" + termPanel.Handle.ToString("X") +
                 " -LoadCfgFile \"" + argXmlFile.Text + "\"" +
                 " -Dir \"" + argDirectory.Text + "\"" +
                 " -cmd " + // This one MUST be the last switch
                 argCmdLine.Text + sRunAs // And the shell command line itself
-                );
+                ;
 
-            // Start monitoring
-            timer1.Start();
+            try {
+                // Start ConEmu
+                ConEmu = Process.Start(argConEmuExe.Text, sRunArgs);
+                RefreshControls(true);
+                // Start monitoring
+                timer1.Start();
+            } catch (System.ComponentModel.Win32Exception ex) {
+                RefreshControls(false);
+                MessageBox.Show(ex.Message + "\r\n\r\n" +
+                    "Command:\r\n" + argConEmuExe.Text + "\r\n\r\n" +
+                    "Arguments:\r\n" + sRunArgs,
+                    ex.GetType().FullName + " (" + ex.NativeErrorCode.ToString() + ")",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void startArgs_Enter(object sender, EventArgs e)
