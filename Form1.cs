@@ -75,7 +75,9 @@ namespace ConEmuInside
             string sOurDir = Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
             string[] sSearchIn = {
               Directory.GetCurrentDirectory(),
-              sOurDir, Path.Combine(sOurDir, "ConEmu"),
+              sOurDir,
+              Path.Combine(sOurDir, ".."),
+              Path.Combine(sOurDir, "ConEmu"),
               "%PATH%", "%REG%"
               };
 
