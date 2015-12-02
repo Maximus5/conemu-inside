@@ -32,6 +32,8 @@ namespace ConEmuInside
             RefreshControls(false);
             // Force focus to ‘cmd line’ control
             argCmdLine.Select();
+            //
+            termPanel.Resize += new System.EventHandler(this.termPanel_Resize);
         }
 
         private void RefreshControls(bool bTermActive)
@@ -251,6 +253,23 @@ namespace ConEmuInside
         private void startArgs_Enter(object sender, EventArgs e)
         {
             AcceptButton = startBtn;
+        }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        internal static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+        [DllImport("user32.dll", SetLastError = true)]
+        internal static extern IntPtr FindWindowEx(IntPtr hParent, IntPtr hChild, string szClass, string szWindow);
+
+        private void termPanel_Resize(object sender, EventArgs e)
+        {
+            if (ConEmu != null)
+            {
+                IntPtr hConEmu = FindWindowEx(termPanel.Handle, (IntPtr)0, null, null);
+                if (hConEmu != (IntPtr)0)
+                {
+                    MoveWindow(hConEmu, 0, 0, termPanel.Width, termPanel.Height, true);
+                }
+            }
         }
     }
 }
