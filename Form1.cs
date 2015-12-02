@@ -23,18 +23,83 @@ namespace ConEmuInside
 
         private void ChildTerminal_Load(object sender, EventArgs e)
         {
-            String lsOurDir, lsXmlFile, lsShell;
+            string lsOurDir;
+            argConEmuExe.Text = GetConEmu();
+            argDirectory.Text = Directory.GetCurrentDirectory();
             lsOurDir = Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-            lsXmlFile = Path.Combine(lsOurDir, "ConEmu.xml");
-            lsShell = @"{cmd}"; // Use ConEmu's default {cmd} task
-            ConEmu = Process.Start("ConEmu.exe",
-                " -InsideWnd 0x" + termPanel.Handle.ToString("X") +
-                " -LoadCfgFile \"" + lsXmlFile + "\"" +
-                " -cmd " + // This one MUST be the last switch
-                lsShell // And the shell command line itself
-                );
-            // Start monitoring
-            timer1.Start();
+            argXmlFile.Text = Path.Combine(lsOurDir, "ConEmu.xml");
+            argCmdLine.Text = @"{cmd}"; // Use ConEmu's default {cmd} task
+            RefreshControls(false);
+            // Force focus to ‘cmd line’ control
+            argCmdLine.Select();
+        }
+
+        private void RefreshControls(bool bTermActive)
+        {
+            if (bTermActive)
+            {
+                AcceptButton = null;
+                groupBox2.Enabled = true;
+                if (startPanel.Visible)
+                {
+                    promptBox.Focus();
+                    startPanel.Visible = false;
+                }
+                if (!termPanel.Visible)
+                {
+                    termPanel.Visible = true;
+                }
+            }
+            else
+            {
+                if (termPanel.Visible)
+                {
+                    termPanel.Visible = false;
+                }
+                if (!startPanel.Visible)
+                {
+                    startPanel.Visible = true;
+                    argCmdLine.Focus();
+                }
+                groupBox2.Enabled = false;
+                AcceptButton = startBtn;
+            }
+
+
+        }
+
+        private string GetConEmu()
+        {
+            string sOurDir = Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            string[] sSearchIn = {
+              Directory.GetCurrentDirectory(),
+              sOurDir, Path.Combine(sOurDir, "ConEmu"),
+              "%PATH%", "%REG%"
+              };
+
+            string[] sNames;
+            sNames = new string[] { "ConEmu.exe", "ConEmu64.exe" };
+
+            foreach (string sd in sSearchIn)
+            {
+                foreach (string sn in sNames)
+                {
+                    string spath;
+                    if (sd == "%PATH%" || sd == "%REG%")
+                    {
+                        spath = sn; //TODO
+                    }
+                    else
+                    {
+                        spath = Path.Combine(sd, sn);
+                    }
+                    if (File.Exists(spath))
+                        return spath;
+                }
+            }
+
+            // Default
+            return "ConEmu.exe";
         }
 
         private string GetConEmuC()
@@ -128,6 +193,47 @@ namespace ConEmuInside
             //if (AcceptButton == printBtn)
             //AcceptButton = null;
             //promptBox.Text = "...out...";
+        }
+
+        private void exeBtn_Click(object sender, EventArgs e)
+        {
+            //
+        }
+
+        private void cmdBtn_Click(object sender, EventArgs e)
+        {
+            //
+        }
+
+        private void dirBtn_Click(object sender, EventArgs e)
+        {
+            //
+        }
+
+        private void startBtn_Click(object sender, EventArgs e)
+        {
+            string sRunAs;
+
+            // Show terminal panel, hide start options
+            RefreshControls(true);
+
+            sRunAs = argRunAs.Checked ? " -cur_console:a" : "";
+
+            ConEmu = Process.Start(argConEmuExe.Text,
+                " -InsideWnd 0x" + termPanel.Handle.ToString("X") +
+                " -LoadCfgFile \"" + argXmlFile.Text + "\"" +
+                " -Dir \"" + argDirectory.Text + "\"" +
+                " -cmd " + // This one MUST be the last switch
+                argCmdLine.Text + sRunAs // And the shell command line itself
+                );
+
+            // Start monitoring
+            timer1.Start();
+        }
+
+        private void startArgs_Enter(object sender, EventArgs e)
+        {
+            AcceptButton = startBtn;
         }
     }
 }
