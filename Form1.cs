@@ -197,17 +197,34 @@ namespace ConEmuInside
 
         private void exeBtn_Click(object sender, EventArgs e)
         {
-            //
+            openFileDialog1.Title = "Choose ConEmu main executable";
+            openFileDialog1.FileName = argConEmuExe.Text;
+            if (openFileDialog1.ShowDialog() == DialogResult.OK)
+            {
+                argConEmuExe.Text = openFileDialog1.FileName;
+            }
+            argConEmuExe.Focus();
         }
 
         private void cmdBtn_Click(object sender, EventArgs e)
         {
-            //
+            openFileDialog1.Title = "Choose startup shell";
+            openFileDialog1.FileName = "";
+            if (openFileDialog1.ShowDialog() == DialogResult.OK)
+            {
+                argCmdLine.Text = openFileDialog1.FileName;
+            }
+            argCmdLine.Focus();
         }
 
         private void dirBtn_Click(object sender, EventArgs e)
         {
-            //
+            folderBrowserDialog1.SelectedPath = argDirectory.Text;
+            if (folderBrowserDialog1.ShowDialog() == DialogResult.OK)
+            {
+                argDirectory.Text = folderBrowserDialog1.SelectedPath;
+            }
+            argDirectory.Focus();
         }
 
         private void startBtn_Click(object sender, EventArgs e)
