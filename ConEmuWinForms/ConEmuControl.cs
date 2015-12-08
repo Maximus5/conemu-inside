@@ -17,6 +17,10 @@ using Microsoft.Build.Utilities;
 
 namespace ConEmu.WinForms
 {
+	/// <summary>
+	///     <para>The console emulator control.</para>
+	///     <para>If <see cref="IsStartingImmediately" />, immediately runs the command in <see cref="ConsoleCommandLine" /> and shows the console emulator in the control. Otherwise (or after the process exits), shows the gray background.</para>
+	/// </summary>
 	public unsafe class ConEmuControl : Control
 	{
 		[NotNull]
@@ -30,7 +34,15 @@ namespace ConEmu.WinForms
 
 		readonly IDictionary<string, string> _environment = new Dictionary<string, string>();
 
+		private bool _isElevated;
+
+		bool _isEverRun;
+
+		private bool _isStartingImmediately = true;
+
 		private bool _isStatusbarVisible = true;
+
+		private int _nLastExitCode;
 
 		/// <summary>
 		/// The ConEmu process, when it's running; or <c>NULL</c> otherwise.
@@ -49,6 +61,8 @@ namespace ConEmu.WinForms
 		/// </summary>
 		[CanBeNull]
 		private string _sConEmuSettingsWrittenTempFile;
+
+		private string _sConsoleCommandLine = "{cmd}"; /* this is the standard ConEmu task name for the console */
 
 		public ConEmuControl()
 		{
@@ -105,21 +119,71 @@ namespace ConEmu.WinForms
 			}
 		}
 
+		/// <summary>
+		/// The command line to execute in the console emulator on <see cref="Start" /> or when the control is created if <see cref="IsStartingImmediately" />.
+		/// </summary>
 		[NotNull]
-		public string ConsoleCommandLine { get; set; } = /*"%COMSPEC%"*/ "{cmd}";
+		public string ConsoleCommandLine
+		{
+			get
+			{
+				return _sConsoleCommandLine;
+			}
+			set
+			{
+				AssertNotRunning();
+				_sConsoleCommandLine = value;
+			}
+		}
 
 		/// <summary>
 		/// Gets the state of the console emulator.
 		/// </summary>
-		public States ConsoleState => _process == null ? States.Empty : States.Running;
+		public States ConsoleState => _process != null ? States.Running : (_isEverRun ? States.Exited : States.Empty);
 
-		public bool IsElevated { get; set; }
+		/// <summary>
+		/// Whether the console process is currently running.
+		/// </summary>
+		public bool IsConsoleProcessRunning => _process != null;
+
+		/// <summary>
+		/// Gets or sets whether the console process is to be run elevated (an elevation prompt will be shown).
+		/// </summary>
+		public bool IsElevated
+		{
+			get
+			{
+				return _isElevated;
+			}
+			set
+			{
+				AssertNotRunning();
+				_isElevated = value;
+			}
+		}
 
 		/// <summary>
 		///     <para>Gets or sets whether this control will start the console process as soon as it's loaded on the form.</para>
 		///     <para>You can either specify the console executable to run in <see cref="ConsoleCommandLine" /> (the console window will close as soon as it exits), or use its default value for <c>COMSPEC</c> and execute your command in that console with <see cref="PasteText" /> (the console will remain operable after the command completes).</para>
 		/// </summary>
-		public bool IsStartingImmediately { get; set; } = true;
+		public bool IsStartingImmediately
+		{
+			get
+			{
+				return _isStartingImmediately;
+			}
+			set
+			{
+				AssertNotRunning();
+				if(_isEverRun)
+					throw new InvalidOperationException("IsStartingImmediately can only be changed before the first console process runs in this control.");
+				_isStartingImmediately = value;
+
+				// Invariant: if changed to TRUE past the normal IsStartingImmediately checking point
+				if((value) && (IsHandleCreated))
+					Start();
+			}
+		}
 
 		public bool IsStatusbarVisible
 		{
@@ -132,6 +196,19 @@ namespace ConEmu.WinForms
 				_isStatusbarVisible = value;
 				if(_process != null)
 					BeginGuiMacro("Status").WithParam(0).WithParam(value ? 1 : 2).Execute();
+			}
+		}
+
+		/// <summary>
+		/// Gets the exit code of the most recently terminated console process.
+		/// </summary>
+		public int LastExitCode
+		{
+			get
+			{
+				if(!_isEverRun)
+					throw new InvalidOperationException("The console process has never run in this control.");
+				return _nLastExitCode;
 			}
 		}
 
@@ -319,22 +396,29 @@ namespace ConEmu.WinForms
 			{
 				if(!File.Exists(ConEmuExecutablePath))
 					throw new InvalidOperationException($"Missing ConEmu executable at location “{ConEmuExecutablePath}”.");
-				var process = new Process() {StartInfo = new ProcessStartInfo(ConEmuExecutablePath, cmdl.ToString()) {UseShellExecute = false}};
+				var processNew = new Process() {StartInfo = new ProcessStartInfo(ConEmuExecutablePath, cmdl.ToString()) {UseShellExecute = false}};
 
 				// Bind process termination
-				process.EnableRaisingEvents = true;
-				process.Exited += delegate
+				processNew.EnableRaisingEvents = true;
+				processNew.Exited += delegate
 				{
-					if(_process == null)
-						return;
-					_process = null;
-					Invalidate();
-					ConsoleStateChanged?.Invoke(this, EventArgs.Empty);
+					// Ensure STA
+					BeginInvoke(new Action(() =>
+					{
+						Process processWas = _process;
+						if(processWas == null)
+							return;
+						_nLastExitCode = processWas.ExitCode;
+						_process = null;
+						Invalidate();
+						ConsoleStateChanged?.Invoke(this, EventArgs.Empty);
+					}));
 				};
 
-				if(!process.Start())
+				if(!processNew.Start())
 					throw new InvalidOperationException("The process did not start.");
-				_process = process;
+				_process = processNew;
+				_isEverRun = true;
 
 				ConsoleStateChanged?.Invoke(this, EventArgs.Empty);
 			}
@@ -346,7 +430,7 @@ namespace ConEmu.WinForms
 
 		private void AssertNotRunning()
 		{
-			if(ConsoleState == States.Running)
+			if(_process != null)
 				throw new InvalidOperationException("This change is not possible when a console process is already running.");
 		}
 
@@ -623,8 +707,19 @@ namespace ConEmu.WinForms
 
 	public enum States
 	{
+		/// <summary>
+		/// There has been no console process executed in this control yet.
+		/// </summary>
 		Empty,
 
-		Running
+		/// <summary>
+		/// The console process is currently running.
+		/// </summary>
+		Running,
+
+		/// <summary>
+		/// The console process has been run in this control, but has exited.
+		/// </summary>
+		Exited
 	}
 }
