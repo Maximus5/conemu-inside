@@ -402,17 +402,21 @@ namespace ConEmu.WinForms
 				processNew.EnableRaisingEvents = true;
 				processNew.Exited += delegate
 				{
-					// Ensure STA
-					BeginInvoke(new Action(() =>
+					if((Disposing) || (IsDisposed))
+						_process = null; // Don't threadmarshal if process is killed on disposing
+					else
 					{
-						Process processWas = _process;
-						if(processWas == null)
-							return;
-						_nLastExitCode = processWas.ExitCode;
-						_process = null;
-						Invalidate();
-						ConsoleStateChanged?.Invoke(this, EventArgs.Empty);
-					}));
+						BeginInvoke(new Action(() => // Ensure STA
+						{
+							Process processWas = _process;
+							if(processWas == null)
+								return;
+							_nLastExitCode = processWas.ExitCode;
+							_process = null;
+							Invalidate();
+							ConsoleStateChanged?.Invoke(this, EventArgs.Empty);
+						}));
+					}
 				};
 
 				if(!processNew.Start())
