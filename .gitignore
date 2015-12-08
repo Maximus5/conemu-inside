@@ -6,3 +6,6 @@ obj
 .vs
 *.sdf
 *.opensdf
+
+ConEmu.CommandLine/Tools/ConEmu/*
+*.nupkg

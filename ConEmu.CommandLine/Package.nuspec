@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+	<metadata>
+		<id>ConEmu.Console</id>
+		<version>1.0.151207.0</version>
+		<title>ConEmu, a Windows Console Emulator</title>
+		<authors>Maximus5</authors>
+		<owners>Maximus5</owners>
+		<projectUrl>http://conemu.github.io/</projectUrl>
+		<requireLicenseAcceptance>false</requireLicenseAcceptance>
+		<description>ConEmu (also known as ConEmu-Maximus5) is an advanced console window (also known as local terminal emulator). You can run in ConEmu two types of applications (1) "console" such as cmd.exe, powershell.exe, Far Manager, bash, etc., and (2) "graphical" (GUI) like Notepad, PuTTY, KiTTY, GVim, Notepad, mintty and so on. ConEmu acts as terminal (aka console emulator) for "console" type applications and sort of tabbed environment (holder) for GUI applications. It was primarily developed as a Far Manager (a popular file manager, text editor) companion but now, you can use ConEmu with other console and GUI apps that runs on Windows such as PowerShell, bash, PuTTY, Notepad and many others. This is an Open Source project (BSD license) and you can run it on Microsoft Windows 2000 or later. Although this is an advanced console and not a shell, you can run any shell that you want and it has an extensive list of features.</description>
+		<licenseUrl>https://opensource.org/licenses/BSD-3-Clause</licenseUrl>
+	</metadata>
+</package>
