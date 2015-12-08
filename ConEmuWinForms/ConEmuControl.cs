@@ -1,9 +1,13 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows.Forms;
 using System.Xml;
 
@@ -16,17 +20,33 @@ namespace ConEmu.WinForms
 	public unsafe class ConEmuControl : Control
 	{
 		[NotNull]
+		static readonly string ConEmuConsoleExtenderExeName = "ConEmuC.exe";
+
+		[NotNull]
 		static readonly string ConEmuExeName = "conemu.exe";
 
 		[NotNull]
 		private static readonly string ConEmuSubfolderName = "ConEmu";
 
+		readonly IDictionary<string, string> _environment = new Dictionary<string, string>();
+
+		/// <summary>
+		/// The ConEmu process, when it's running; or <c>NULL</c> otherwise.
+		/// </summary>
+		[CanBeNull]
 		private Process _process;
 
-		[CanBeNull]
-		private string _sConEmuSettingsFile;
+		[NotNull]
+		private string _sConEmuConsoleExtenderExecutablePath = "";
 
-		private States _state;
+		[NotNull]
+		private string _sConEmuExecutablePath = "";
+
+		/// <summary>
+		/// Should clean up upon dispose.
+		/// </summary>
+		[CanBeNull]
+		private string _sConEmuSettingsWrittenTempFile;
 
 		public ConEmuControl()
 		{
@@ -34,18 +54,62 @@ namespace ConEmu.WinForms
 			ConEmuExecutablePath = InitConEmuLocation();
 		}
 
-		public string ConEmuExecutablePath { get; set; }
-
+		/// <summary>
+		/// Gets or sets the path to the ConEmu console extender (<c>ConEmuC.exe</c>).
+		/// Will be autodetected from the path to this DLL or from <see cref="ConEmuExecutablePath" /> if possible.
+		/// </summary>
 		[NotNull]
-		public string ConsoleCommandLine { get; set; } = "%COMSPEC%";
-
-		public States ConsoleState
+		public string ConEmuConsoleExtenderExecutablePath
 		{
 			get
 			{
-				return _state;
+				return _sConEmuConsoleExtenderExecutablePath;
+			}
+			set
+			{
+				if(value == null)
+					throw new ArgumentNullException(nameof(value));
+				if((value == "") && (_sConEmuConsoleExtenderExecutablePath == ""))
+					return;
+				if(value == "")
+					throw new ArgumentOutOfRangeException(nameof(value), value, "Cannot reset path to an empty string.");
+				_sConEmuConsoleExtenderExecutablePath = value; // Delay existence check 'til we call it
 			}
 		}
+
+		/// <summary>
+		/// Gets or sets the path to the <c>ConEmu.exe</c> which will be the console emulator root process.
+		/// Will be autodetected from the path to this DLL if possible.
+		/// </summary>
+		[NotNull]
+		public string ConEmuExecutablePath
+		{
+			get
+			{
+				return _sConEmuExecutablePath;
+			}
+			set
+			{
+				if(value == null)
+					throw new ArgumentNullException(nameof(value));
+				if((value == "") && (_sConEmuExecutablePath == ""))
+					return;
+				if(value == "")
+					throw new ArgumentOutOfRangeException(nameof(value), value, "Cannot reset path to an empty string.");
+				_sConEmuExecutablePath = value; // Delay existence check 'til we call it
+
+				if(_sConEmuConsoleExtenderExecutablePath == "")
+					_sConEmuConsoleExtenderExecutablePath = TryDeriveConEmuConsoleExtenderExecutablePath(_sConEmuExecutablePath);
+			}
+		}
+
+		[NotNull]
+		public string ConsoleCommandLine { get; set; } = /*"%COMSPEC%"*/"{cmd}";
+
+		/// <summary>
+		/// Gets the state of the console emulator.
+		/// </summary>
+		public States ConsoleState => _process == null ? States.Empty : States.Running;
 
 		public bool IsElevated { get; set; }
 
@@ -55,11 +119,22 @@ namespace ConEmu.WinForms
 		/// </summary>
 		public bool IsStartingImmediately { get; set; } = true;
 
+		public bool IsStatusbarVisible { get; set; } = true;
+
 		/// <summary>
 		/// Optional. Overrides the startup directory for the console process.
 		/// </summary>
 		[CanBeNull]
 		public string StartupDirectory { get; set; }
+
+		[Pure]
+		public MacroBuilder BeginGuiMacro([NotNull] string sMacroName)
+		{
+			if(sMacroName == null)
+				throw new ArgumentNullException(nameof(sMacroName));
+
+			return new MacroBuilder(this, sMacroName, Enumerable.Empty<string>());
+		}
 
 		/// <summary>
 		/// The EnumChildWindows function enumerates the child windows that belong to the specified parent window by passing the handle to each child window, in turn, to an application-defined callback function. EnumChildWindows continues until the last child window is enumerated or the callback function returns FALSE.
@@ -73,6 +148,90 @@ namespace ConEmu.WinForms
 		public static extern Int32 EnumChildWindows(void* hWndParent, void* lpEnumFunc, IntPtr lParam);
 
 		/// <summary>
+		/// Gets the startup environment variables. This does not reflect the env vars of a running console process.
+		/// </summary>
+		[NotNull]
+		public IEnumerable<string> EnumEnv()
+		{
+			return _environment.Keys.ToArray();
+		}
+
+		[NotNull]
+		public string ExecuteGuiMacroText([NotNull] string macrotext)
+		{
+			if(macrotext == null)
+				throw new ArgumentNullException(nameof(macrotext));
+
+			Process process = _process;
+			if(process == null)
+				throw new InvalidOperationException("Cannot execute a macro because the console process is not running at the moment.");
+
+			// conemuc.exe -silent -guimacro:1234 print("\e","git"," --version","\n")
+			var cmdl = new CommandLineBuilder();
+			cmdl.AppendSwitch("-silent");
+			cmdl.AppendSwitchIfNotNull("-GuiMacro:", process.Id.ToString());
+			cmdl.AppendSwitch(macrotext /* appends the text unquoted for cmdline */);
+
+			string exe = ConEmuConsoleExtenderExecutablePath;
+			if(exe == "")
+				throw new InvalidOperationException("The ConEmu Console Extender Executable is not available.");
+			if(!File.Exists(exe))
+				throw new InvalidOperationException($"The ConEmu Console Extender Executable does not exist on disk at “{exe}”.");
+
+			try
+			{
+				Process.Start(new ProcessStartInfo(exe, cmdl.ToString()) {WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true});
+			}
+			catch(Exception ex)
+			{
+				throw new InvalidOperationException($"Could not run the ConEmu Console Extender Executable at “{exe}” with command-line arguments “{cmdl}”.", ex);
+			}
+
+			return ""; // TODO: how to receive the result of a GUI Macro?
+		}
+
+		/// <summary>
+		/// Gets the startup environment variables. This does not reflect the env vars of a running console process.
+		/// </summary>
+		/// <param name="name"></param>
+		/// <returns></returns>
+		[CanBeNull]
+		public string GetEnv([NotNull] string name)
+		{
+			if(string.IsNullOrEmpty(name))
+				throw new ArgumentNullException(nameof(name));
+			string value;
+			_environment.TryGetValue(name, out value);
+			return value;
+		}
+
+		public void PasteText([NotNull] string text)
+		{
+			if(text == null)
+				throw new ArgumentNullException(nameof(text));
+			if(text.Length == 0)
+				return;
+
+			BeginGuiMacro("Paste").WithParam(2).WithParam(text).Execute();
+		}
+
+		/// <summary>
+		/// Sets the startup environment variables for the console process, before it is started.
+		/// </summary>
+		/// <param name="name"></param>
+		/// <param name="value"></param>
+		public void SetEnv([NotNull] string name, [CanBeNull] string value)
+		{
+			if(string.IsNullOrEmpty(name))
+				throw new ArgumentNullException(nameof(name));
+			AssertNotRunning();
+			if(value == null)
+				_environment.Remove(name);
+			else
+				_environment[name] = value;
+		}
+
+		/// <summary>
 		/// The SetFocus function sets the keyboard focus to the specified window. The window must be attached to the calling thread's message queue. The SetFocus function sends a WM_KILLFOCUS message to the window that loses the keyboard focus and a WM_SETFOCUS message to the window that receives the keyboard focus. It also activates either the window that receives the focus or the parent of the window that receives the focus. If a window is active but does not have the focus, any key pressed will produce the WM_SYSCHAR, WM_SYSKEYDOWN, or WM_SYSKEYUP message. If the VK_MENU key is also pressed, the lParam parameter of the message will have bit 30 set. Otherwise, the messages produced do not have this bit set. By using the AttachThreadInput function, a thread can attach its input processing to another thread. This allows a thread to call SetFocus to set the keyboard focus to a window attached to another thread's message queue.
 		/// </summary>
 		/// <param name="hWnd">[in] Handle to the window that will receive the keyboard input. If this parameter is NULL, keystrokes are ignored. </param>
@@ -82,7 +241,7 @@ namespace ConEmu.WinForms
 
 		public void Start()
 		{
-			if(_state != States.Empty)
+			if(_process != null)
 				throw new InvalidOperationException("Cannot start a new console process because another one is already running.");
 			if(string.IsNullOrEmpty(ConsoleCommandLine))
 				throw new InvalidOperationException("Cannot start a new console process for command line “{0}” because it's either NULL, or empty, or whitespace.");
@@ -119,7 +278,25 @@ namespace ConEmu.WinForms
 			{
 				if(!File.Exists(ConEmuExecutablePath))
 					throw new InvalidOperationException($"Missing ConEmu executable at location “{ConEmuExecutablePath}”.");
-				_process = Process.Start(ConEmuExecutablePath, cmdl.ToString());
+				Process process = _process = Process.Start(ConEmuExecutablePath, cmdl.ToString());
+				if(process == null)
+					throw new InvalidOperationException("The process did not start.");
+
+				// Bind process termination
+				process.EnableRaisingEvents = true;
+				Action FOnExited = () =>
+				{
+					if(_process == null)
+						return;
+					_process = null;
+					Invalidate();
+					ConsoleStateChanged?.Invoke(this, EventArgs.Empty);
+				};
+				process.Exited += delegate { FOnExited(); };
+				if(process.HasExited)
+					FOnExited();
+
+				ConsoleStateChanged?.Invoke(this, EventArgs.Empty);
 			}
 			catch(Win32Exception ex)
 			{
@@ -127,16 +304,37 @@ namespace ConEmu.WinForms
 			}
 		}
 
+		private void AssertNotRunning()
+		{
+			if(ConsoleState == States.Running)
+				throw new InvalidOperationException("This change is not possible when a console process is already running.");
+		}
+
+		public event EventHandler ConsoleStateChanged;
+
 		protected override void Dispose(bool disposing)
 		{
 			base.Dispose(disposing);
 
-			// Cleanup working file
-			if(_sConEmuSettingsFile != null)
+			// Cleanup console process
+			if(_process != null)
 			{
 				try
 				{
-					File.Delete(_sConEmuSettingsFile);
+					_process.Kill();
+				}
+				catch(Exception)
+				{
+					// Nothing to do with it
+				}
+			}
+
+			// Cleanup working file
+			if(_sConEmuSettingsWrittenTempFile != null)
+			{
+				try
+				{
+					File.Delete(_sConEmuSettingsWrittenTempFile);
 				}
 				catch(Exception)
 				{
@@ -150,28 +348,48 @@ namespace ConEmu.WinForms
 			// Load default template
 			var xmldoc = new XmlDocument();
 			xmldoc.Load(new MemoryStream(Resources.ConEmuSettingsTemplate));
+			XmlNode xmlSettings = xmldoc.SelectSingleNode("/key[@name='Software']/key[@name='ConEmu']/key[@name='.Vanilla']");
+			if(xmlSettings == null)
+				throw new InvalidOperationException("Unexpected mismatch in XML resource structure.");
 
 			// Apply settings from properties
-			// …
+			{
+				var xmlElem = ((XmlElement)(xmlSettings.SelectSingleNode("value[@name='StatusBar.Show']") ?? xmlSettings.AppendChild(xmldoc.CreateElement("value"))));
+				xmlElem.SetAttribute("type", "hex");
+				xmlElem.SetAttribute("data", (IsStatusbarVisible ? 1 : 0).ToString());
+			}
+
+			// Environment variables
+			if(_environment.Any())
+			{
+				var xmlElem = ((XmlElement)(xmlSettings.SelectSingleNode("value[@name='EnvironmentSet']") ?? xmlSettings.AppendChild(xmldoc.CreateElement("value"))));
+				xmlElem.SetAttribute("type", "multi");
+				foreach(KeyValuePair<string, string> pair in _environment)
+				{
+					XmlElement xmlLine;
+					xmlElem.AppendChild(xmlLine = xmldoc.CreateElement("line"));
+					xmlLine.SetAttribute("data", $"set {pair.Key}={pair.Value}");
+				}
+			}
 
 			// Write to temp location
-			if(_sConEmuSettingsFile == null)
-				_sConEmuSettingsFile = Path.GetTempFileName() + ".ConEmuSettings.Xml";
-			xmldoc.Save(_sConEmuSettingsFile);
+			if(_sConEmuSettingsWrittenTempFile == null)
+				_sConEmuSettingsWrittenTempFile = Path.GetTempFileName() + ".ConEmuSettings.Xml";
+			xmldoc.Save(_sConEmuSettingsWrittenTempFile);
 
-			return _sConEmuSettingsFile;
+			return _sConEmuSettingsWrittenTempFile;
 		}
 
-		[CanBeNull]
+		[NotNull]
 		private static string InitConEmuLocation()
 		{
 			// Look alongside this DLL and in a subfolder
 			string asmpath = new Uri(Assembly.GetExecutingAssembly().EscapedCodeBase, UriKind.Absolute).LocalPath;
 			if(string.IsNullOrEmpty(asmpath))
-				return null;
+				return "";
 			string dir = Path.GetDirectoryName(asmpath);
 			if(string.IsNullOrEmpty(dir))
-				return null;
+				return "";
 
 			// ConEmu.exe in the same folder as this control DLL
 			string candidate = Path.Combine(dir, ConEmuExeName);
@@ -184,7 +402,7 @@ namespace ConEmu.WinForms
 				return candidate;
 
 			// Not found by our standard means, rely on user to set path, otherwise will fail to start
-			return null;
+			return "";
 		}
 
 		protected override void OnGotFocus(EventArgs e)
@@ -204,22 +422,33 @@ namespace ConEmu.WinForms
 			base.OnHandleCreated(e);
 		}
 
-		protected override void OnPreviewKeyDown(PreviewKeyDownEventArgs e)
+		protected override void OnPaint(PaintEventArgs args)
 		{
-			Trace.WriteLine($"PvKD {e.KeyData}");
-			base.OnPreviewKeyDown(e);
+			if(_process != null)
+				return;
+			args.Graphics.FillRectangle(SystemBrushes.ControlDark, args.ClipRectangle);
 		}
 
-		protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+		[NotNull]
+		private static string TryDeriveConEmuConsoleExtenderExecutablePath([NotNull] string sConEmuPath)
 		{
-			Trace.WriteLine($"PCK {keyData}");
-			return base.ProcessCmdKey(ref msg, keyData);
-		}
+			if(sConEmuPath == null)
+				throw new ArgumentNullException(nameof(sConEmuPath));
+			if(sConEmuPath == "")
+				return "";
+			string dir = Path.GetDirectoryName(sConEmuPath);
+			if(string.IsNullOrEmpty(dir))
+				return "";
 
-		protected override bool ProcessDialogKey(Keys keyData)
-		{
-			Trace.WriteLine($"PDK: {keyData}");
-			return base.ProcessDialogKey(keyData);
+			string candidate = Path.Combine(dir, ConEmuConsoleExtenderExeName);
+			if(File.Exists(candidate))
+				return candidate;
+
+			candidate = Path.Combine(Path.Combine(dir, ConEmuSubfolderName), "ConEmuC.exe");
+			if(File.Exists(candidate))
+				return candidate;
+
+			return "";
 		}
 
 		[CanBeNull]
@@ -244,6 +473,102 @@ namespace ConEmu.WinForms
 		/// <returns>To continue enumeration, the callback function must return TRUE; to stop enumeration, it must return FALSE.</returns>
 		/// <remarks>An application must register this callback function by passing its address to EnumWindows or EnumDesktopWindows. </remarks>
 		public delegate Int32 EnumWindowsProc(void* hwnd, IntPtr lParam);
+
+		public sealed class MacroBuilder
+		{
+			[NotNull]
+			private readonly ConEmuControl _owner;
+
+			[NotNull]
+			private readonly IEnumerable<string> _parameters;
+
+			[NotNull]
+			private readonly string _sMacroName;
+
+			internal MacroBuilder([NotNull] ConEmuControl owner, [NotNull] string sMacroName, [NotNull] IEnumerable<string> parameters)
+			{
+				if(owner == null)
+					throw new ArgumentNullException(nameof(owner));
+				if(sMacroName == null)
+					throw new ArgumentNullException(nameof(sMacroName));
+				if(parameters == null)
+					throw new ArgumentNullException(nameof(parameters));
+
+				_owner = owner;
+				_sMacroName = sMacroName;
+				_parameters = parameters;
+			}
+
+			/// <summary>
+			/// Renders the macro and executes with ConEmu.
+			/// </summary>
+			[CanBeNull]
+			public string Execute()
+			{
+				return _owner.ExecuteGuiMacroText(RenderMacroCommand());
+			}
+
+			/// <summary>
+			/// Adds a parameter.
+			/// </summary>
+			[NotNull]
+			[Pure]
+			public MacroBuilder WithParam([NotNull] string value)
+			{
+				if(value == null)
+					throw new ArgumentNullException(nameof(value));
+				return new MacroBuilder(_owner, _sMacroName, _parameters.Concat(new[] {value}));
+			}
+
+			/// <summary>
+			/// Adds a parameter.
+			/// </summary>
+			[NotNull]
+			[Pure]
+			public MacroBuilder WithParam(int value)
+			{
+				return WithParam(value.ToString());
+			}
+
+			bool isAlphanumeric([NotNull] string s)
+			{
+				if(s == null)
+					throw new ArgumentNullException(nameof(s));
+				foreach(char ch in s)
+				{
+					if((!char.IsLetterOrDigit(ch)) && (ch != '_'))
+						return false;
+				}
+				return true;
+			}
+
+			[Pure]
+			[NotNull]
+			private string RenderMacroCommand()
+			{
+				var sb = new StringBuilder();
+				if(!isAlphanumeric(_sMacroName))
+					throw new InvalidOperationException("The macro name must be alphanumeric.");
+				sb.Append(_sMacroName);
+				sb.Append('(');
+
+				bool isFirst = true;
+				foreach(string parameter in _parameters)
+				{
+					if(isFirst)
+						isFirst = false;
+					else
+						sb.Append(',');
+
+					if(isAlphanumeric(parameter))
+						sb.Append(parameter);
+					else
+						sb.Append('@').Append('"').Append(parameter.Replace("\"", "\"\"")).Append('"');
+				}
+				sb.Append(')');
+				return sb.ToString();
+			}
+		}
 	}
 
 	public enum States
