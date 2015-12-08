@@ -38,6 +38,8 @@ namespace ConEmu.WinForms
 
 		bool _isEverRun;
 
+		private bool _isKeepingTerminalOnCommandExit = true;
+
 		private bool _isStartingImmediately = true;
 
 		private bool _isStatusbarVisible = true;
@@ -62,7 +64,7 @@ namespace ConEmu.WinForms
 		[CanBeNull]
 		private string _sConEmuSettingsWrittenTempFile;
 
-		private string _sConsoleCommandLine = "{cmd}"; /* this is the standard ConEmu task name for the console */
+		private string _sConsoleCommandLine = DefaultConsoleCommandLine;
 
 		public ConEmuControl()
 		{
@@ -120,7 +122,9 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		/// The command line to execute in the console emulator on <see cref="Start" /> or when the control is created if <see cref="IsStartingImmediately" />.
+		///     <para>The command line to execute in the console emulator on <see cref="Start" /> or when the control is created if <see cref="IsStartingImmediately" />.</para>
+		///     <para>The default is <see cref="DefaultConsoleCommandLine" />.</para>
+		///     <para>This property cannot be changed when the process is running.</para>
 		/// </summary>
 		[NotNull]
 		public string ConsoleCommandLine
@@ -142,12 +146,20 @@ namespace ConEmu.WinForms
 		public States ConsoleState => _process != null ? States.Running : (_isEverRun ? States.Exited : States.Empty);
 
 		/// <summary>
+		/// The default for <see cref="ConsoleCommandLine" />.
+		/// Runs the stock ConEmu task for the Windows command line.
+		/// </summary>
+		public static string DefaultConsoleCommandLine = "{cmd}";
+
+		/// <summary>
 		/// Whether the console process is currently running.
 		/// </summary>
 		public bool IsConsoleProcessRunning => _process != null;
 
 		/// <summary>
-		/// Gets or sets whether the console process is to be run elevated (an elevation prompt will be shown).
+		///     <para>Gets or sets whether the console process is to be run elevated (an elevation prompt will be shown).</para>
+		///     <para>The default is <c>False</c>.</para>
+		///     <para>This property cannot be changed when the process is running.</para>
 		/// </summary>
 		public bool IsElevated
 		{
@@ -159,6 +171,25 @@ namespace ConEmu.WinForms
 			{
 				AssertNotRunning();
 				_isElevated = value;
+			}
+		}
+
+		/// <summary>
+		///     <para>Gets or sets whether the terminal emulator view should keep displaying the last contents after the console process specified in <see cref="ConsoleCommandLine" /> exits.</para>
+		///     <para>If <c>False</c>, the console emulator view closes and control background is displayed immediately upon process exit.</para>
+		///     <para>The default is <c>True</c>.</para>
+		///     <para>This property cannot be changed when the process is running.</para>
+		/// </summary>
+		public bool IsKeepingTerminalOnCommandExit
+		{
+			get
+			{
+				return _isKeepingTerminalOnCommandExit;
+			}
+			set
+			{
+				AssertNotRunning();
+				_isKeepingTerminalOnCommandExit = value;
 			}
 		}
 
@@ -382,8 +413,7 @@ namespace ConEmu.WinForms
 			// And the shell command line itself
 			cmdl.AppendSwitch("-cmd");
 			cmdl.AppendSwitch(ConsoleCommandLine);
-			if(IsElevated)
-				cmdl.AppendSwitchIfNotNull("-cur_console:", "a");
+			cmdl.AppendSwitchIfNotNull("-cur_console:", $"{(IsElevated ? "a" : "")}{(IsKeepingTerminalOnCommandExit ? "c" : "")}");
 
 			if(string.IsNullOrEmpty(ConEmuExecutablePath))
 			{

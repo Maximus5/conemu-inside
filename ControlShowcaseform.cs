@@ -11,6 +11,8 @@ namespace ConEmuInside
 	{
 		public ControlShowcaseForm()
 		{
+			Size = new Size(800, 600);
+
 			ConEmuControl conemu;
 			Controls.Add(conemu = new ConEmuControl() {Dock = DockStyle.Fill, MinimumSize = new Size(200, 200), IsStartingImmediately = true, IsStatusbarVisible = true});
 			conemu.SetEnv("one", "two");
@@ -34,6 +36,18 @@ namespace ConEmuInside
 			CheckBox checkStatusBar;
 			stack.Controls.Add(checkStatusBar = new CheckBox() {Text = "StatusBar", Checked = conemu.IsStatusbarVisible});
 			checkStatusBar.CheckedChanged += delegate { conemu.IsStatusbarVisible = checkStatusBar.Checked; };
+
+			stack.Controls.Add(btn = new Button() {Text = "Whois?", AutoSize = true, Dock = DockStyle.Left});
+			btn.Click += delegate
+			{
+				if(conemu.IsConsoleProcessRunning)
+				{
+					MessageBox.Show(this, "The console is busy right now.", "Whois", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+					return;
+				}
+				conemu.ConsoleCommandLine = "whois microsoft.com";
+				conemu.Start();
+			};
 		}
 	}
 }
