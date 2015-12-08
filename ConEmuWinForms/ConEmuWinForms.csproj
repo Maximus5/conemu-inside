@@ -55,6 +55,9 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="ConEmu.xml" />
+    <None Include="Package.nuspec">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="Resources\ConEmu.WinForms.dll" />
   </ItemGroup>
   <ItemGroup>
