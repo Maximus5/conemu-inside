@@ -15,8 +15,8 @@ namespace ConEmuInside
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-			new ControlShowcaseForm().Show();
-            Application.Run(new ChildTerminal());
+            new ChildTerminal().Show();
+            Application.Run(new ControlShowcaseForm());
         }
     }
 }

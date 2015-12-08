@@ -104,7 +104,7 @@ namespace ConEmu.WinForms
 		}
 
 		[NotNull]
-		public string ConsoleCommandLine { get; set; } = /*"%COMSPEC%"*/"{cmd}";
+		public string ConsoleCommandLine { get; set; } = /*"%COMSPEC%"*/ "{cmd}";
 
 		/// <summary>
 		/// Gets the state of the console emulator.
@@ -156,20 +156,24 @@ namespace ConEmu.WinForms
 			return _environment.Keys.ToArray();
 		}
 
-		[NotNull]
-		public string ExecuteGuiMacroText([NotNull] string macrotext)
+		/// <summary>
+		/// Executes a ConEmu GUI Macro on the active console, see http://conemu.github.io/en/GuiMacro.html .
+		/// </summary>
+		/// <param name="macrotext">The full macro command, see http://conemu.github.io/en/GuiMacro.html .</param>
+		/// <param name="FWhenDone">Optional. Executes on the same thread when the macro is done executing.</param>
+		public void ExecuteGuiMacroText([NotNull] string macrotext, [CanBeNull] Action<GuiMacroResult> FWhenDone = null)
 		{
 			if(macrotext == null)
 				throw new ArgumentNullException(nameof(macrotext));
 
-			Process process = _process;
-			if(process == null)
+			Process processConEmu = _process;
+			if(processConEmu == null)
 				throw new InvalidOperationException("Cannot execute a macro because the console process is not running at the moment.");
 
 			// conemuc.exe -silent -guimacro:1234 print("\e","git"," --version","\n")
 			var cmdl = new CommandLineBuilder();
 			cmdl.AppendSwitch("-silent");
-			cmdl.AppendSwitchIfNotNull("-GuiMacro:", process.Id.ToString());
+			cmdl.AppendSwitchIfNotNull("-GuiMacro:", processConEmu.Id.ToString());
 			cmdl.AppendSwitch(macrotext /* appends the text unquoted for cmdline */);
 
 			string exe = ConEmuConsoleExtenderExecutablePath;
@@ -180,14 +184,37 @@ namespace ConEmu.WinForms
 
 			try
 			{
-				Process.Start(new ProcessStartInfo(exe, cmdl.ToString()) {WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true});
+				var processExtender = new Process() {StartInfo = new ProcessStartInfo(exe, cmdl.ToString()) {WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true, UseShellExecute = false}};
+				if(FWhenDone != null)
+				{
+					var sbResult = new StringBuilder();
+					processExtender.EnableRaisingEvents = true;
+					processExtender.Exited += delegate
+					{
+						GuiMacroResult result;
+						lock(sbResult)
+						{
+							result = new GuiMacroResult() {ErrorLevel = processExtender.ExitCode, Response = sbResult.ToString()};
+						}
+						BeginInvoke(FWhenDone, result);
+					};
+
+					DataReceivedEventHandler FOnData = (sender, args) =>
+					{
+						lock(sbResult)
+							sbResult.Append(args.Data);
+					};
+					processExtender.OutputDataReceived += FOnData;
+					processExtender.ErrorDataReceived += FOnData;
+				}
+				processExtender.Start();
+				processExtender.BeginOutputReadLine();
+				processExtender.BeginErrorReadLine();
 			}
 			catch(Exception ex)
 			{
 				throw new InvalidOperationException($"Could not run the ConEmu Console Extender Executable at “{exe}” with command-line arguments “{cmdl}”.", ex);
 			}
-
-			return ""; // TODO: how to receive the result of a GUI Macro?
 		}
 
 		/// <summary>
@@ -278,13 +305,11 @@ namespace ConEmu.WinForms
 			{
 				if(!File.Exists(ConEmuExecutablePath))
 					throw new InvalidOperationException($"Missing ConEmu executable at location “{ConEmuExecutablePath}”.");
-				Process process = _process = Process.Start(ConEmuExecutablePath, cmdl.ToString());
-				if(process == null)
-					throw new InvalidOperationException("The process did not start.");
+				var process = new Process() {StartInfo = new ProcessStartInfo(ConEmuExecutablePath, cmdl.ToString()) {UseShellExecute = false}};
 
 				// Bind process termination
 				process.EnableRaisingEvents = true;
-				Action FOnExited = () =>
+				process.Exited += delegate
 				{
 					if(_process == null)
 						return;
@@ -292,9 +317,10 @@ namespace ConEmu.WinForms
 					Invalidate();
 					ConsoleStateChanged?.Invoke(this, EventArgs.Empty);
 				};
-				process.Exited += delegate { FOnExited(); };
-				if(process.HasExited)
-					FOnExited();
+
+				if(!process.Start())
+					throw new InvalidOperationException("The process did not start.");
+				_process = process;
 
 				ConsoleStateChanged?.Invoke(this, EventArgs.Empty);
 			}
@@ -474,6 +500,22 @@ namespace ConEmu.WinForms
 		/// <remarks>An application must register this callback function by passing its address to EnumWindows or EnumDesktopWindows. </remarks>
 		public delegate Int32 EnumWindowsProc(void* hwnd, IntPtr lParam);
 
+		/// <summary>
+		/// A result of executing the GUI macro.
+		/// </summary>
+		public struct GuiMacroResult
+		{
+			/// <summary>
+			/// ERRORLEVEL of the ConEmu Console Extender process.
+			/// </summary>
+			public int ErrorLevel;
+
+			/// <summary>
+			/// String response of the command, “<c>OK</c>” if successful and without output.
+			/// </summary>
+			public string Response;
+		}
+
 		public sealed class MacroBuilder
 		{
 			[NotNull]
@@ -502,10 +544,10 @@ namespace ConEmu.WinForms
 			/// <summary>
 			/// Renders the macro and executes with ConEmu.
 			/// </summary>
-			[CanBeNull]
-			public string Execute()
+			/// <param name="FWhenDone">Optional. Executes on the same thread when the macro is done executing.</param>
+			public void Execute(Action<GuiMacroResult> FWhenDone = null)
 			{
-				return _owner.ExecuteGuiMacroText(RenderMacroCommand());
+				_owner.ExecuteGuiMacroText(RenderMacroCommand(), FWhenDone);
 			}
 
 			/// <summary>
@@ -550,22 +592,16 @@ namespace ConEmu.WinForms
 				if(!isAlphanumeric(_sMacroName))
 					throw new InvalidOperationException("The macro name must be alphanumeric.");
 				sb.Append(_sMacroName);
-				sb.Append('(');
 
-				bool isFirst = true;
 				foreach(string parameter in _parameters)
 				{
-					if(isFirst)
-						isFirst = false;
-					else
-						sb.Append(',');
+					sb.Append(' ');
 
 					if(isAlphanumeric(parameter))
 						sb.Append(parameter);
 					else
 						sb.Append('@').Append('"').Append(parameter.Replace("\"", "\"\"")).Append('"');
 				}
-				sb.Append(')');
 				return sb.ToString();
 			}
 		}
