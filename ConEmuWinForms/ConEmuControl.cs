@@ -30,6 +30,8 @@ namespace ConEmu.WinForms
 
 		readonly IDictionary<string, string> _environment = new Dictionary<string, string>();
 
+		private bool _isStatusbarVisible = true;
+
 		/// <summary>
 		/// The ConEmu process, when it's running; or <c>NULL</c> otherwise.
 		/// </summary>
@@ -119,7 +121,19 @@ namespace ConEmu.WinForms
 		/// </summary>
 		public bool IsStartingImmediately { get; set; } = true;
 
-		public bool IsStatusbarVisible { get; set; } = true;
+		public bool IsStatusbarVisible
+		{
+			get
+			{
+				return _isStatusbarVisible;
+			}
+			set
+			{
+				_isStatusbarVisible = value;
+				if(_process != null)
+					BeginGuiMacro("Status").WithParam(0).WithParam(value ? 1 : 2).Execute();
+			}
+		}
 
 		/// <summary>
 		/// Optional. Overrides the startup directory for the console process.
