@@ -14,9 +14,9 @@ namespace ConEmuInside
 			Size = new Size(800, 600);
 
 			ConEmuControl conemu;
-			Controls.Add(conemu = new ConEmuControl() {Dock = DockStyle.Fill, MinimumSize = new Size(200, 200), IsStartingImmediately = true, IsStatusbarVisible = true});
-			conemu.SetEnv("one", "two");
-			conemu.SetEnv("geet", "huub");
+			Controls.Add(conemu = new ConEmuControl() {Dock = DockStyle.Fill, MinimumSize = new Size(200, 200), IsStatusbarVisible = true, AutoStartInfo = {IsReadingConsoleAnsiStream = true}});
+			conemu.AutoStartInfo.SetEnv("one", "two");
+			conemu.AutoStartInfo.SetEnv("geet", "huub");
 			TextBox txt;
 			Controls.Add(txt = new TextBox() {Text = "AnotherFocusableControl", AutoSize = true, Dock = DockStyle.Top});
 
@@ -45,8 +45,7 @@ namespace ConEmuInside
 					MessageBox.Show(this, "The console is busy right now.", "Whois", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 					return;
 				}
-				conemu.ConsoleCommandLine = "whois microsoft.com";
-				conemu.Start();
+				conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "whois microsoft.com"});
 			};
 		}
 	}

@@ -1,0 +1,312 @@
+﻿using System;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Text;
+using System.Windows.Forms;
+using System.Xml;
+
+using JetBrains.Annotations;
+
+using Microsoft.Build.Utilities;
+
+namespace ConEmu.WinForms
+{
+	/// <summary>
+	/// A single session of the console emulator run. Each top-level command execution spawns a new session.
+	/// </summary>
+	public unsafe class ConEmuSession
+	{
+		[NotNull]
+		private readonly WindowsFormsSynchronizationContext _dispatcher;
+
+		/// <summary>
+		/// The ConEmu process, even after it exits.
+		/// </summary>
+		[NotNull]
+		private readonly Process _process;
+
+		[NotNull]
+		private readonly ConEmuStartInfo _startinfo;
+
+		public ConEmuSession([NotNull] ConEmuStartInfo startinfo, [NotNull] HostContext hostcontext)
+		{
+			if(startinfo == null)
+				throw new ArgumentNullException(nameof(startinfo));
+			if(hostcontext == null)
+				throw new ArgumentNullException(nameof(hostcontext));
+			_startinfo = startinfo;
+			startinfo.MarkAsUsedUp();
+
+			_dispatcher = new WindowsFormsSynchronizationContext();
+
+			if(string.IsNullOrEmpty(startinfo.ConsoleCommandLine))
+				throw new InvalidOperationException("Cannot start a new console process for command line “{0}” because it's either NULL, or empty, or whitespace.");
+
+			var cmdl = new CommandLineBuilder();
+
+			// This sets up hosting of ConEmu in our control
+			cmdl.AppendSwitch("-InsideWnd");
+			cmdl.AppendFileNameIfNotNull("0x" + ((ulong)hostcontext.HWndParent).ToString("X"));
+
+			// Basic settings, like fonts and hidden tab bar
+			// Plus some of the properties on this class
+			cmdl.AppendSwitch("-LoadCfgFile");
+			cmdl.AppendFileNameIfNotNull(EmitConfigFile(_dirLocalTempRoot, startinfo, hostcontext));
+
+			if(!string.IsNullOrEmpty(startinfo.StartupDirectory))
+			{
+				cmdl.AppendSwitch("-Dir");
+				cmdl.AppendFileNameIfNotNull(startinfo.StartupDirectory);
+			}
+
+			// Write console buffer output to a file
+			DirectoryInfo dirAnsiLog = null;
+			if(startinfo.IsReadingConsoleAnsiStream)
+			{
+				dirAnsiLog = _dirLocalTempRoot;
+				dirAnsiLog.Create();
+
+				// Submit to ConEmu
+				cmdl.AppendSwitch("-AnsiLog");
+				cmdl.AppendFileNameIfNotNull(dirAnsiLog.FullName);
+
+				// Delete any prev files
+				try
+				{
+					foreach(FileInfo fi in dirAnsiLog.GetFiles("ConEmu-*.log"))
+						fi.Delete();
+				}
+				catch(Exception)
+				{
+					// Ignore here
+				}
+			}
+
+			// This one MUST be the last switch
+			// And the shell command line itself
+			cmdl.AppendSwitch("-cmd");
+			cmdl.AppendSwitch(startinfo.ConsoleCommandLine);
+			cmdl.AppendSwitchIfNotNull("-cur_console:", $"{(startinfo.IsElevated ? "a" : "")}{(startinfo.IsKeepingTerminalOnCommandExit ? "c" : "")}");
+
+			if(string.IsNullOrEmpty(startinfo.ConEmuExecutablePath))
+				throw new InvalidOperationException("Could not run the console emulator. The path to ConEmu.exe could not be detected.");
+
+			// Start ConEmu
+			try
+			{
+				if(!File.Exists(startinfo.ConEmuExecutablePath))
+					throw new InvalidOperationException($"Missing ConEmu executable at location “{startinfo.ConEmuExecutablePath}”.");
+				var processNew = new Process() {StartInfo = new ProcessStartInfo(startinfo.ConEmuExecutablePath, cmdl.ToString()) {UseShellExecute = false}};
+
+				// Bind process termination
+				processNew.EnableRaisingEvents = true;
+				processNew.Exited += delegate
+				{
+					// TODO: ensure all output is read out
+					_dispatcher.Post(o => // Ensure STA
+					{
+						// Notify client on the proper thread
+						ConsoleEmulatorExited?.Invoke(this, EventArgs.Empty);
+					}, null);
+
+					// Cleanup any leftover temp files
+					try
+					{
+						_dirLocalTempRoot.Delete(true);
+					}
+					catch(Exception)
+					{
+						// Not interested
+					}
+				};
+
+				if(!processNew.Start())
+					throw new Win32Exception("The process did not start.");
+				_process = processNew;
+			}
+			catch(Win32Exception ex)
+			{
+				throw new InvalidOperationException("Could not run the console emulator. " + ex.Message + $" ({ex.NativeErrorCode:X8})" + Environment.NewLine + Environment.NewLine + "Command:" + Environment.NewLine + startinfo.ConEmuExecutablePath + Environment.NewLine + Environment.NewLine + "Arguments:" + Environment.NewLine + cmdl, ex);
+			}
+
+			// Attach input file
+			if(dirAnsiLog != null)
+			{
+				// NOTE: can't run GUI macro immediately
+				//				BeginGuiMacro("GetInfo").WithParam("AnsiLog").Execute(result => MessageBox.Show(result.Response));
+
+				//				FileInfo lastOrDefault = dirAnsiLog.GetFiles("ConEmu-*.log").OrderBy(fi=>fi.CreationTimeUtc).LastOrDefault();
+			}
+		}
+
+		[NotNull]
+		public ConEmuStartInfo StartInfo
+		{
+			get
+			{
+				return _startinfo;
+			}
+		}
+
+		/// <summary>
+		/// Starts construction of the ConEmu GUI Macro.
+		/// </summary>
+		[Pure]
+		public GuiMacroBuilder BeginGuiMacro([NotNull] string sMacroName)
+		{
+			if(sMacroName == null)
+				throw new ArgumentNullException(nameof(sMacroName));
+
+			return new GuiMacroBuilder(this, sMacroName, Enumerable.Empty<string>());
+		}
+
+		/// <summary>
+		/// Executes a ConEmu GUI Macro on the active console, see http://conemu.github.io/en/GuiMacro.html .
+		/// </summary>
+		/// <param name="macrotext">The full macro command, see http://conemu.github.io/en/GuiMacro.html .</param>
+		/// <param name="FWhenDone">Optional. Executes on the same thread when the macro is done executing.</param>
+		public void ExecuteGuiMacroText([NotNull] string macrotext, [CanBeNull] Action<GuiMacroResult> FWhenDone = null)
+		{
+			if(macrotext == null)
+				throw new ArgumentNullException(nameof(macrotext));
+
+			Process processConEmu = _process;
+			if(processConEmu == null)
+				throw new InvalidOperationException("Cannot execute a macro because the console process is not running at the moment.");
+
+			// conemuc.exe -silent -guimacro:1234 print("\e","git"," --version","\n")
+			var cmdl = new CommandLineBuilder();
+			cmdl.AppendSwitch("-silent");
+			cmdl.AppendSwitchIfNotNull("-GuiMacro:", processConEmu.Id.ToString());
+			cmdl.AppendSwitch(macrotext /* appends the text unquoted for cmdline */);
+
+			string exe = _startinfo.ConEmuConsoleExtenderExecutablePath;
+			if(exe == "")
+				throw new InvalidOperationException("The ConEmu Console Extender Executable is not available.");
+			if(!File.Exists(exe))
+				throw new InvalidOperationException($"The ConEmu Console Extender Executable does not exist on disk at “{exe}”.");
+
+			try
+			{
+				var processExtender = new Process() {StartInfo = new ProcessStartInfo(exe, cmdl.ToString()) {WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true, UseShellExecute = false}};
+				if(FWhenDone != null)
+				{
+					var sbResult = new StringBuilder();
+					processExtender.EnableRaisingEvents = true;
+					processExtender.Exited += delegate
+					{
+						GuiMacroResult result;
+						lock(sbResult)
+						{
+							result = new GuiMacroResult() {ErrorLevel = processExtender.ExitCode, Response = sbResult.ToString()};
+						}
+						_dispatcher.Post(delegate { FWhenDone(result); }, null);
+					};
+
+					DataReceivedEventHandler FOnData = (sender, args) =>
+					{
+						lock(sbResult)
+							sbResult.Append(args.Data);
+					};
+					processExtender.OutputDataReceived += FOnData;
+					processExtender.ErrorDataReceived += FOnData;
+				}
+				processExtender.Start();
+				processExtender.BeginOutputReadLine();
+				processExtender.BeginErrorReadLine();
+			}
+			catch(Exception ex)
+			{
+				throw new InvalidOperationException($"Could not run the ConEmu Console Extender Executable at “{exe}” with command-line arguments “{cmdl}”.", ex);
+			}
+		}
+
+		/// <summary>
+		/// Kills the process if it is running.
+		/// </summary>
+		public void Kill()
+		{
+			if(!_process.HasExited)
+				_process.Kill();
+		}
+
+		[NotNull]
+		private DirectoryInfo _dirLocalTempRoot => new DirectoryInfo(Path.Combine(Path.Combine(Path.GetTempPath(), "ConEmu"), $"{DateTime.UtcNow.ToString("s").Replace(':', '-')}.{Process.GetCurrentProcess().Id:X8}.{unchecked((uint)RuntimeHelpers.GetHashCode(this)):X8}"));
+
+		public int ExitCode
+		{
+			get
+			{
+			if(!_process.HasExited)
+					throw new InvalidOperationException("The exit code is not available yet because the process has not yet exited.");
+			return _process.ExitCode;
+			}
+		}
+
+		// Prefixed with date-sortable; then PID; then sync table id of this object
+
+		public event EventHandler ConsoleEmulatorExited;
+
+		private static string EmitConfigFile([NotNull] DirectoryInfo dirForConfigFile, [NotNull] ConEmuStartInfo startinfo, [NotNull] HostContext hostcontext)
+		{
+			if(dirForConfigFile == null)
+				throw new ArgumentNullException(nameof(dirForConfigFile));
+			if(startinfo == null)
+				throw new ArgumentNullException(nameof(startinfo));
+			if(hostcontext == null)
+				throw new ArgumentNullException(nameof(hostcontext));
+			// Load default template
+			var xmldoc = new XmlDocument();
+			xmldoc.Load(new MemoryStream(Resources.ConEmuSettingsTemplate));
+			XmlNode xmlSettings = xmldoc.SelectSingleNode("/key[@name='Software']/key[@name='ConEmu']/key[@name='.Vanilla']");
+			if(xmlSettings == null)
+				throw new InvalidOperationException("Unexpected mismatch in XML resource structure.");
+
+			// Apply settings from properties
+			{
+				var xmlElem = ((XmlElement)(xmlSettings.SelectSingleNode("value[@name='StatusBar.Show']") ?? xmlSettings.AppendChild(xmldoc.CreateElement("value"))));
+				xmlElem.SetAttribute("type", "hex");
+				xmlElem.SetAttribute("data", (hostcontext.IsStatusbarVisibleInitial ? 1 : 0).ToString());
+			}
+
+			// Environment variables
+			if(startinfo.EnumEnv().Any())
+			{
+				var xmlElem = ((XmlElement)(xmlSettings.SelectSingleNode("value[@name='EnvironmentSet']") ?? xmlSettings.AppendChild(xmldoc.CreateElement("value"))));
+				xmlElem.SetAttribute("type", "multi");
+				foreach(string key in startinfo.EnumEnv())
+				{
+					XmlElement xmlLine;
+					xmlElem.AppendChild(xmlLine = xmldoc.CreateElement("line"));
+					xmlLine.SetAttribute("data", $"set {key}={startinfo.GetEnv(key)}");
+				}
+			}
+
+			// Write out to temp location
+			dirForConfigFile.Create();
+			string sConfigFile = Path.Combine(dirForConfigFile.FullName, "Config.Xml");
+			xmldoc.Save(sConfigFile);
+
+			return sConfigFile;
+		}
+
+		public class HostContext
+		{
+			public HostContext([NotNull] void* hWndParent, bool isStatusbarVisibleInitial)
+			{
+				if(hWndParent == null)
+					throw new ArgumentNullException(nameof(hWndParent));
+				HWndParent = hWndParent;
+				IsStatusbarVisibleInitial = isStatusbarVisibleInitial;
+			}
+
+			[NotNull]
+			public readonly void* HWndParent;
+
+			public readonly bool IsStatusbarVisibleInitial;
+		}
+	}
+}
