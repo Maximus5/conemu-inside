@@ -13,13 +13,13 @@ namespace ConEmu.WinForms
 	/// </summary>
 	public sealed class ConEmuStartInfo
 	{
+		private StreamReader _ansireader;
+
 		readonly IDictionary<string, string> _environment = new Dictionary<string, string>();
 
 		private bool _isElevated;
 
 		private bool _isKeepingTerminalOnCommandExit = true;
-
-		private bool _isReadingConsoleAnsiStream;
 
 		private bool _isUsedUp;
 
@@ -88,6 +88,24 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
+		///     <para>Gets or sets the routine which will receive the raw ANSI stream of the console commands.</para>
+		///     <para>If <c>NULL</c>, then console ANSI output will not be collected.</para>
+		/// </summary>
+		[CanBeNull]
+		public StreamReader ConsoleAnsiStreamReader
+		{
+			get
+			{
+				return _ansireader;
+			}
+			set
+			{
+				AssertNotUsedUp();
+				_ansireader = value;
+			}
+		}
+
+		/// <summary>
 		///     <para>The command line to execute in the console emulator as the top-level process. The session terminates when this command exits.</para>
 		///     <para>The default is <see cref="ConEmuConstants.DefaultConsoleCommandLine" />.</para>
 		///     <para>This property cannot be changed when the process is running.</para>
@@ -140,19 +158,6 @@ namespace ConEmu.WinForms
 			{
 				AssertNotUsedUp();
 				_isKeepingTerminalOnCommandExit = value;
-			}
-		}
-
-		public bool IsReadingConsoleAnsiStream
-		{
-			get
-			{
-				return _isReadingConsoleAnsiStream;
-			}
-			set
-			{
-				AssertNotUsedUp();
-				_isReadingConsoleAnsiStream = value;
 			}
 		}
 
@@ -273,5 +278,10 @@ namespace ConEmu.WinForms
 
 			return "";
 		}
+
+		/// <summary>
+		/// Delegate for <see cref="ConEmuStartInfo.ConsoleAnsiStreamReader" />.
+		/// </summary>
+		public delegate void StreamReader([NotNull] string chunk);
 	}
 }

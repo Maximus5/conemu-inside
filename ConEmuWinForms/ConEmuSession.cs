@@ -22,6 +22,8 @@ namespace ConEmu.WinForms
 		[NotNull]
 		private readonly WindowsFormsSynchronizationContext _dispatcher;
 
+		bool _isPayloadExited;
+
 		/// <summary>
 		/// The ConEmu process, even after it exits.
 		/// </summary>
@@ -64,7 +66,8 @@ namespace ConEmu.WinForms
 
 			// Write console buffer output to a file
 			DirectoryInfo dirAnsiLog = null;
-			if(startinfo.IsReadingConsoleAnsiStream)
+			ConEmuStartInfo.StreamReader streamreader = startinfo.ConsoleAnsiStreamReader;
+			if(streamreader != null)
 			{
 				dirAnsiLog = _dirLocalTempRoot;
 				dirAnsiLog.Create();
@@ -72,17 +75,6 @@ namespace ConEmu.WinForms
 				// Submit to ConEmu
 				cmdl.AppendSwitch("-AnsiLog");
 				cmdl.AppendFileNameIfNotNull(dirAnsiLog.FullName);
-
-				// Delete any prev files
-				try
-				{
-					foreach(FileInfo fi in dirAnsiLog.GetFiles("ConEmu-*.log"))
-						fi.Delete();
-				}
-				catch(Exception)
-				{
-					// Ignore here
-				}
 			}
 
 			// This one MUST be the last switch
@@ -93,6 +85,9 @@ namespace ConEmu.WinForms
 
 			if(string.IsNullOrEmpty(startinfo.ConEmuExecutablePath))
 				throw new InvalidOperationException("Could not run the console emulator. The path to ConEmu.exe could not be detected.");
+
+			EventHandler evtPolling = null;
+			EventHandler evtCleanupOnExit = null;
 
 			// Start ConEmu
 			try
@@ -105,22 +100,18 @@ namespace ConEmu.WinForms
 				processNew.EnableRaisingEvents = true;
 				processNew.Exited += delegate
 				{
-					// TODO: ensure all output is read out
 					_dispatcher.Post(o => // Ensure STA
 					{
+						evtCleanupOnExit?.Invoke(this, EventArgs.Empty);
+
 						// Notify client on the proper thread
+						if(!_isPayloadExited)
+						{
+							_isPayloadExited = true;
+							PayloadExited?.Invoke(this, EventArgs.Empty);
+						}
 						ConsoleEmulatorExited?.Invoke(this, EventArgs.Empty);
 					}, null);
-
-					// Cleanup any leftover temp files
-					try
-					{
-						_dirLocalTempRoot.Delete(true);
-					}
-					catch(Exception)
-					{
-						// Not interested
-					}
 				};
 
 				if(!processNew.Start())
@@ -132,13 +123,98 @@ namespace ConEmu.WinForms
 				throw new InvalidOperationException("Could not run the console emulator. " + ex.Message + $" ({ex.NativeErrorCode:X8})" + Environment.NewLine + Environment.NewLine + "Command:" + Environment.NewLine + startinfo.ConEmuExecutablePath + Environment.NewLine + Environment.NewLine + "Arguments:" + Environment.NewLine + cmdl, ex);
 			}
 
+			// TODO: for now, this will be a polling timer, consider free-threaded treatment later on
+			var timer = new Timer() {Interval = (int)TimeSpan.FromSeconds(.1).TotalMilliseconds, Enabled = true};
+			timer.Tick += delegate
+			{
+				evtPolling?.Invoke(this, EventArgs.Empty);
+				if(_process.HasExited)
+				{
+					evtPolling = null; // Timer might fire a few more fake events on disposal
+					timer.Dispose();
+				}
+			};
+			evtCleanupOnExit += delegate { timer.Dispose(); };
+
 			// Attach input file
 			if(dirAnsiLog != null)
 			{
 				// NOTE: can't run GUI macro immediately
 				//				BeginGuiMacro("GetInfo").WithParam("AnsiLog").Execute(result => MessageBox.Show(result.Response));
 
-				//				FileInfo lastOrDefault = dirAnsiLog.GetFiles("ConEmu-*.log").OrderBy(fi=>fi.CreationTimeUtc).LastOrDefault();
+				// A function which processes the part of the stream which gets available (or does the rest of it at the end)
+				// TODO: try managing memory traffic
+				FileInfo fiLog = null;
+				FileStream fstream = null;
+				Action FPumpStream = () =>
+				{
+					if(fiLog == null)
+						fiLog = dirAnsiLog.GetFiles("ConEmu*.log").FirstOrDefault();
+					if((fstream == null) && (fiLog != null))
+						fstream = fiLog.Open(FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+
+					if(fstream != null)
+					{
+						long length = fstream.Length;
+						if(fstream.Position < length)
+						{
+							var buffer = new byte[length - fstream.Position];
+							int nRead = fstream.Read(buffer, 0, buffer.Length);
+							if(nRead > 0)
+								streamreader(Encoding.Default.GetString(buffer, 0, nRead));
+						}
+					}
+				};
+
+				// Do the pumping periodically (TODO: take this to async?.. but would like to keep the final evt on the home thread, unless we go to tasks)
+				evtPolling += delegate { FPumpStream(); };
+				evtCleanupOnExit += delegate
+				{
+					// Must pump out the rest of the stream
+					FPumpStream();
+					// Close the file if open
+					fstream?.Dispose(); // Don't NULL it because this way it would throw in case we accidentally call Pump once more
+				};
+			}
+
+			evtCleanupOnExit += delegate
+			{
+				// Cleanup any leftover temp files
+				try
+				{
+					if(_dirLocalTempRoot.Exists)
+						_dirLocalTempRoot.Delete(true);
+				}
+				catch(Exception)
+				{
+					// Not interested
+				}
+			};
+
+			/*
+			// Detect when payload process exits
+			// TODO: use specific conemu functionality for that
+			IList<Process> processesToWait = new List<Process>();
+			evtPolling += delegate
+			{
+				if(_isPayloadExited)
+					return;
+				if(_process.HasExited)
+					return;
+			if(processesToWait.Any(p=>!p.HasExited))	// Definitely has not exited if they're there
+						return;
+				Process.GetProcesses().Where(p=>p.p)
+			};
+*/
+		}
+
+		public int ExitCode
+		{
+			get
+			{
+				if(!_process.HasExited)
+					throw new InvalidOperationException("The exit code is not available yet because the process has not yet exited.");
+				return _process.ExitCode;
 			}
 		}
 
@@ -234,20 +310,11 @@ namespace ConEmu.WinForms
 		}
 
 		[NotNull]
-		private DirectoryInfo _dirLocalTempRoot => new DirectoryInfo(Path.Combine(Path.Combine(Path.GetTempPath(), "ConEmu"), $"{DateTime.UtcNow.ToString("s").Replace(':', '-')}.{Process.GetCurrentProcess().Id:X8}.{unchecked((uint)RuntimeHelpers.GetHashCode(this)):X8}"));
+		private DirectoryInfo _dirLocalTempRoot => new DirectoryInfo(Path.Combine(Path.Combine(Path.GetTempPath(), "ConEmu"), $"{DateTime.UtcNow.ToString("s").Replace(':', '-')}.{Process.GetCurrentProcess().Id:X8}.{unchecked((uint)RuntimeHelpers.GetHashCode(this)):X8}")); // Prefixed with date-sortable; then PID; then sync table id of this object
 
-		public int ExitCode
-		{
-			get
-			{
-			if(!_process.HasExited)
-					throw new InvalidOperationException("The exit code is not available yet because the process has not yet exited.");
-			return _process.ExitCode;
-			}
-		}
-
-		// Prefixed with date-sortable; then PID; then sync table id of this object
-
+		/// <summary>
+		/// Fires when the console emulator process exits and stops rendering the terminal view. Note that the root command might have had stopped running long before this moment if <see cref="ConEmuStartInfo.IsKeepingTerminalOnCommandExit" /> prevents terminating the terminal view immediately.
+		/// </summary>
 		public event EventHandler ConsoleEmulatorExited;
 
 		private static string EmitConfigFile([NotNull] DirectoryInfo dirForConfigFile, [NotNull] ConEmuStartInfo startinfo, [NotNull] HostContext hostcontext)
@@ -292,6 +359,11 @@ namespace ConEmu.WinForms
 
 			return sConfigFile;
 		}
+
+		/// <summary>
+		/// Fires when the payload command exits within the terminal. If <see cref="ConEmuStartInfo.IsKeepingTerminalOnCommandExit" />, the terminal stays, otherwise it closes also.
+		/// </summary>
+		public event EventHandler PayloadExited;
 
 		public class HostContext
 		{

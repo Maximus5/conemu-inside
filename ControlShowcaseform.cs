@@ -14,9 +14,10 @@ namespace ConEmuInside
 			Size = new Size(800, 600);
 
 			ConEmuControl conemu;
-			Controls.Add(conemu = new ConEmuControl() {Dock = DockStyle.Fill, MinimumSize = new Size(200, 200), IsStatusbarVisible = true, AutoStartInfo = {IsReadingConsoleAnsiStream = true}});
+			Controls.Add(conemu = new ConEmuControl() {Dock = DockStyle.Fill, MinimumSize = new Size(200, 200), IsStatusbarVisible = true});
 			conemu.AutoStartInfo.SetEnv("one", "two");
 			conemu.AutoStartInfo.SetEnv("geet", "huub");
+			conemu.AutoStartInfo = null;
 			TextBox txt;
 			Controls.Add(txt = new TextBox() {Text = "AnotherFocusableControl", AutoSize = true, Dock = DockStyle.Top});
 
@@ -37,6 +38,8 @@ namespace ConEmuInside
 			stack.Controls.Add(checkStatusBar = new CheckBox() {Text = "StatusBar", Checked = conemu.IsStatusbarVisible});
 			checkStatusBar.CheckedChanged += delegate { conemu.IsStatusbarVisible = checkStatusBar.Checked; };
 
+			TextBox txtOutput = null;
+
 			stack.Controls.Add(btn = new Button() {Text = "Whois?", AutoSize = true, Dock = DockStyle.Left});
 			btn.Click += delegate
 			{
@@ -45,7 +48,9 @@ namespace ConEmuInside
 					MessageBox.Show(this, "The console is busy right now.", "Whois", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 					return;
 				}
-				conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "whois microsoft.com"});
+				if(txtOutput == null)
+					Controls.Add(txtOutput = new TextBox() {Multiline = true, Dock = DockStyle.Right, Width = 200});
+				conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "whois microsoft.com", ConsoleAnsiStreamReader = chunk => txtOutput.Text += chunk});
 			};
 		}
 	}
