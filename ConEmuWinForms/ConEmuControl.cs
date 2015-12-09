@@ -150,7 +150,8 @@ namespace ConEmu.WinForms
 		/// <summary>
 		/// Starts a new console process in the console emulator control.
 		/// </summary>
-		public bool Start([NotNull] ConEmuStartInfo startinfo)
+		[NotNull]
+		public ConEmuSession Start([NotNull] ConEmuStartInfo startinfo)
 		{
 			if(startinfo == null)
 				throw new ArgumentNullException(nameof(startinfo));
@@ -160,16 +161,7 @@ namespace ConEmu.WinForms
 			_autostartinfo = null; // As we're starting, no more chance for an autostart
 			if(!IsHandleCreated)
 				CreateHandle();
-			ConEmuSession session;
-			try
-			{
-				session = new ConEmuSession(startinfo, new ConEmuSession.HostContext((void*)Handle, IsStatusbarVisible));
-			}
-			catch(Exception ex)
-			{
-				MessageBox.Show(ex.Message, "Console Emulator – Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-				return false;
-			}
+			var session = new ConEmuSession(startinfo, new ConEmuSession.HostContext((void*)Handle, IsStatusbarVisible));
 			_running = session;
 			_isEverRun = true;
 			ConsoleStateChanged?.Invoke(this, EventArgs.Empty);
@@ -188,7 +180,7 @@ namespace ConEmu.WinForms
 				Invalidate();
 				ConsoleStateChanged?.Invoke(this, EventArgs.Empty);
 			};
-			return true;
+			return session;
 		}
 
 		[SuppressMessage("ReSharper", "UnusedMember.Local")]
