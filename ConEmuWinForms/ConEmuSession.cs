@@ -191,21 +191,59 @@ namespace ConEmu.WinForms
 				}
 			};
 
-			/*
 			// Detect when payload process exits
-			// TODO: use specific conemu functionality for that
-			IList<Process> processesToWait = new List<Process>();
+			Process processWaitingFor = null; // We know the PID of the process running in the console, and are waiting for it to exit
+			DateTime timeLastAskedForActivePid = DateTime.MinValue;
 			evtPolling += delegate
 			{
 				if(_isPayloadExited)
 					return;
 				if(_process.HasExited)
 					return;
-			if(processesToWait.Any(p=>!p.HasExited))	// Definitely has not exited if they're there
-						return;
-				Process.GetProcesses().Where(p=>p.p)
+				// We've seen an active process, check if it's exited
+				if(processWaitingFor != null)
+				{
+					if(processWaitingFor.HasExited)
+						processWaitingFor = null; // Means the former active process has exited, but we don't know if that were the top-level active process, could have been a child. So make a new request now and check if there's a new active process (or report exited if not)
+				}
+
+				// Don't know no active process, ask ConEmu on that matter
+				if(processWaitingFor == null)
+				{
+					// Waiting for now process yet, ask the console
+					if(DateTime.UtcNow - timeLastAskedForActivePid > TimeSpan.FromSeconds(1)) // Only if not pending a fresh question
+					{
+						timeLastAskedForActivePid = DateTime.UtcNow;
+						BeginGuiMacro("GetInfo").WithParam("ActivePID").Execute(result =>
+						{
+							if(result.ErrorLevel != 0) // E.g. ConEmu has not fully started yet, and ConEmuC failed to connect to the instance — would usually return an error on the first call
+								return;
+							int nActivePid;
+							if(!int.TryParse(result.Response, out nActivePid))
+								return; // Not an int, that's not expected if errorlevel is 0
+							if(nActivePid == 0)
+							{
+								// Means no process is running in ConEmu, all done
+								_isPayloadExited = true;
+								PayloadExited?.Invoke(this, EventArgs.Empty);
+							}
+							else
+							{
+								// Got a process, wait for this process now
+								// Migth sink its Exited event (when we got Tasks here e.g.), but for now it's simpler to reuse the same polling timer
+								try
+								{
+									processWaitingFor = Process.GetProcessById(nActivePid);
+								}
+								catch(Exception)
+								{
+									// Might be various access problems, or the process might have exited in between our getting its PID and attaching
+								}
+							}
+						});
+					}
+				}
 			};
-*/
 		}
 
 		public int ExitCode
@@ -305,8 +343,15 @@ namespace ConEmu.WinForms
 		/// </summary>
 		public void Kill()
 		{
-			if(!_process.HasExited)
-				_process.Kill();
+			try
+			{
+				if(!_process.HasExited)
+					_process.Kill();
+			}
+			catch(Exception)
+			{
+				// Might be a race, so in between HasExited and Kill state could change, ignore possible errors here
+			}
 		}
 
 		[NotNull]
