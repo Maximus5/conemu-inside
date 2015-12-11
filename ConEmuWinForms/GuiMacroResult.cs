@@ -14,5 +14,10 @@
 		/// String response of the command, “<c>OK</c>” if successful and without output.
 		/// </summary>
 		public string Response;
+
+		public override string ToString()
+		{
+			return $"{Response} ({checked((uint)ErrorLevel):X})";
+		}
 	}
 }
