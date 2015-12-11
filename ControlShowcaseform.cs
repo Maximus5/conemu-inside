@@ -50,7 +50,7 @@ namespace ConEmuInside
 				}
 				if(txtOutput == null)
 					Controls.Add(txtOutput = new TextBox() {Multiline = true, Dock = DockStyle.Right, Width = 200});
-				conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "whois microsoft.com", ConsoleAnsiStreamReader = chunk => txtOutput.Text += chunk});
+				conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "cmd.exe /c whois microsoft.com && ECHO ERRORLEVEL=%ERRORLEVEL%", ConsoleAnsiStreamReader = chunk => txtOutput.Text += chunk});
 			};
 		}
 	}
