@@ -20,6 +20,9 @@ namespace ConEmu.WinForms
 	public unsafe class ConEmuSession
 	{
 		[NotNull]
+		private readonly DirectoryInfo _dirLocalTempRoot;
+
+		[NotNull]
 		private readonly WindowsFormsSynchronizationContext _dispatcher;
 
 		bool _isPayloadExited;
@@ -43,6 +46,7 @@ namespace ConEmu.WinForms
 			startinfo.MarkAsUsedUp();
 
 			_dispatcher = new WindowsFormsSynchronizationContext();
+			_dirLocalTempRoot = new DirectoryInfo(Path.Combine(Path.Combine(Path.GetTempPath(), "ConEmu"), $"{DateTime.UtcNow.ToString("s").Replace(':', '-')}.{Process.GetCurrentProcess().Id:X8}.{unchecked((uint)RuntimeHelpers.GetHashCode(this)):X8}")); // Prefixed with date-sortable; then PID; then sync table id of this object
 
 			if(string.IsNullOrEmpty(startinfo.ConsoleCommandLine))
 				throw new InvalidOperationException("Cannot start a new console process for command line “{0}” because it's either NULL, or empty, or whitespace.");
@@ -353,9 +357,6 @@ namespace ConEmu.WinForms
 				// Might be a race, so in between HasExited and Kill state could change, ignore possible errors here
 			}
 		}
-
-		[NotNull]
-		private DirectoryInfo _dirLocalTempRoot => new DirectoryInfo(Path.Combine(Path.Combine(Path.GetTempPath(), "ConEmu"), $"{DateTime.UtcNow.ToString("s").Replace(':', '-')}.{Process.GetCurrentProcess().Id:X8}.{unchecked((uint)RuntimeHelpers.GetHashCode(this)):X8}")); // Prefixed with date-sortable; then PID; then sync table id of this object
 
 		/// <summary>
 		/// Fires when the console emulator process exits and stops rendering the terminal view. Note that the root command might have had stopped running long before this moment if <see cref="ConEmuStartInfo.IsKeepingTerminalOnCommandExit" /> prevents terminating the terminal view immediately.
