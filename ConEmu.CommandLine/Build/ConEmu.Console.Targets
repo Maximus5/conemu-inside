@@ -1,21 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <BuildDependsOn>$(BuildDependsOn);DeployConEmuToolToBinDir</BuildDependsOn>
-    <CleanDependsOn>$(CleanDependsOn);CleanConEmuToolInBinDir</CleanDependsOn>
+    <GetCopyToOutputDirectoryItemsDependsOn>$(GetCopyToOutputDirectoryItemsDependsOn);AddConEmuToolsTaskItems</GetCopyToOutputDirectoryItemsDependsOn>
+    <AssignTargetPathsDependsOn>$(AssignTargetPathsDependsOn);AddConEmuToolsTaskItems</AssignTargetPathsDependsOn>
   </PropertyGroup>
   <ItemGroup>
     <DeployConEmuToolToBinDirInputs_Root Include="$(MSBuildThisFileDirectory)..\Tools\ConEmu\*"/>
     <DeployConEmuToolToBinDirInputs_Ce Include="$(MSBuildThisFileDirectory)..\Tools\ConEmu\ConEmu\*"/>
-    <DeployConEmuToolToBinDirInputs Include="@(DeployConEmuToolToBinDirInputs_Root)"/>
-    <DeployConEmuToolToBinDirInputs Include="@(DeployConEmuToolToBinDirInputs_Ce)"/>
-    <DeployConEmuToolToBinDirOutputs Include="@(DeployConEmuToolToBinDirInputs_Root->'$(OutDir)ConEmu\%(Filename)%(Extension)')"/>
-    <DeployConEmuToolToBinDirOutputs Include="@(DeployConEmuToolToBinDirInputs_Ce->'$(OutDir)ConEmu\ConEmu\%(Filename)%(Extension)')"/>
   </ItemGroup>
-  <Target Name="DeployConEmuToolToBinDir"  Inputs="@(DeployConEmuToolToBinDirInputs)" Outputs="@(DeployConEmuToolToBinDirOutputs);$(OutDir)/ConEmu">
-    <Copy SourceFiles="@(DeployConEmuToolToBinDirInputs)" DestinationFiles="@(DeployConEmuToolToBinDirOutputs)" SkipUnchangedFiles="True" />
-  </Target>
-  <Target Name="CleanConEmuToolInBinDir">
-    <Delete Files="@(DeployConEmuToolToBinDirOutputs)" />
+  <Target Name="AddConEmuToolsTaskItems">
+    <ItemGroup>
+      <None Include="@(DeployConEmuToolToBinDirInputs_Root)">
+        <Link>ConEmu\%(Filename)%(Extension)</Link>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Include="@(DeployConEmuToolToBinDirInputs_Ce)">
+        <Link>ConEmu\ConEmu\%(Filename)%(Extension)</Link>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
   </Target>
 </Project>
