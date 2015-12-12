@@ -100,6 +100,13 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
+		///     <para>Gets the running session, or <c>NULL</c>, if there is currently none.</para>
+		///     <para>To get the running session object in a reliable way for possibly short-running sessions, call <see cref="Start" /> explicitly.</para>
+		/// </summary>
+		[CanBeNull]
+		public ConEmuSession RunningSession => _running;
+
+		/// <summary>
 		/// Starts construction of the ConEmu GUI Macro.
 		/// </summary>
 		[Pure]
