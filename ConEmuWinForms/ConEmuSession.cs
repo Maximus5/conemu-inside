@@ -92,10 +92,13 @@ namespace ConEmu.WinForms
 			}
 
 			// This one MUST be the last switch
-			// And the shell command line itself
 			cmdl.AppendSwitch("-cmd");
-			cmdl.AppendSwitch(startinfo.ConsoleCommandLine);
+
+			// Console mode command
 			cmdl.AppendSwitchIfNotNull("-cur_console:", $"{(startinfo.IsElevated ? "a" : "")}{(startinfo.IsKeepingTerminalOnCommandExit ? "c" : "")}");
+
+			// And the shell command line itself
+			cmdl.AppendSwitch(startinfo.ConsoleCommandLine);
 
 			if(string.IsNullOrEmpty(startinfo.ConEmuExecutablePath))
 				throw new InvalidOperationException("Could not run the console emulator. The path to ConEmu.exe could not be detected.");
