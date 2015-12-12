@@ -29,6 +29,9 @@ namespace ConEmu.WinForms
 		public ConEmuControl()
 		{
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.Opaque | ControlStyles.Selectable, true);
+
+			// Prevent downsizing to zero because the current ConEmu implementation asserts on its HWND having positive dimensions
+			MinimumSize = new Size(1, 1);
 		}
 
 		/// <summary>
