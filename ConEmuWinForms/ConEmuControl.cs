@@ -211,7 +211,7 @@ namespace ConEmu.WinForms
 			{
 				try
 				{
-					_running.Kill();
+					_running.KillConsoleEmulator();
 				}
 				catch(Exception)
 				{

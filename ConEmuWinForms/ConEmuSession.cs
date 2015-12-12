@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -19,6 +20,8 @@ namespace ConEmu.WinForms
 	/// </summary>
 	public unsafe class ConEmuSession
 	{
+		EventHandler<AnsiStreamChunkEventArgs> _ansiStreamChunkReceived;
+
 		[NotNull]
 		private readonly DirectoryInfo _dirLocalTempRoot;
 
@@ -51,6 +54,14 @@ namespace ConEmu.WinForms
 			if(string.IsNullOrEmpty(startinfo.ConsoleCommandLine))
 				throw new InvalidOperationException("Cannot start a new console process for command line “{0}” because it's either NULL, or empty, or whitespace.");
 
+			// Events wiring
+			if(startinfo.AnsiStreamChunkReceivedEventSink != null)
+				_ansiStreamChunkReceived += startinfo.AnsiStreamChunkReceivedEventSink;
+			if(startinfo.PayloadExitedEventSink != null)
+				PayloadExited += startinfo.PayloadExitedEventSink;
+			if(startinfo.ConsoleEmulatorExitedEventSink != null)
+				ConsoleEmulatorExited += startinfo.ConsoleEmulatorExitedEventSink;
+
 			var cmdl = new CommandLineBuilder();
 
 			// This sets up hosting of ConEmu in our control
@@ -70,8 +81,7 @@ namespace ConEmu.WinForms
 
 			// Write console buffer output to a file
 			DirectoryInfo dirAnsiLog = null;
-			ConEmuStartInfo.StreamReader streamreader = startinfo.ConsoleAnsiStreamReader;
-			if(streamreader != null)
+			if(startinfo.IsReadingAnsiStream)
 			{
 				dirAnsiLog = _dirLocalTempRoot;
 				dirAnsiLog.Create();
@@ -106,6 +116,7 @@ namespace ConEmu.WinForms
 				{
 					_dispatcher.Post(o => // Ensure STA
 					{
+#pragma warning disable once AccessToModifiedClosure
 						evtCleanupOnExit?.Invoke(this, EventArgs.Empty);
 
 						// Notify client on the proper thread
@@ -162,10 +173,24 @@ namespace ConEmu.WinForms
 						long length = fstream.Length;
 						if(fstream.Position < length)
 						{
-							var buffer = new byte[length - fstream.Position];
+							var buffer = new byte[length - fstream.Position]; // TODO: buffer pooling
 							int nRead = fstream.Read(buffer, 0, buffer.Length);
 							if(nRead > 0)
-								streamreader(Encoding.Default.GetString(buffer, 0, nRead));
+							{
+								// Buffer exactly for data
+								AnsiStreamChunkEventArgs args;
+								if(nRead < buffer.Length)
+								{
+									var subbuffer = new byte[nRead];
+									Buffer.BlockCopy(buffer, 0, subbuffer, 0, nRead);
+									args = new AnsiStreamChunkEventArgs(subbuffer);
+								}
+								else
+									args = new AnsiStreamChunkEventArgs(buffer);
+
+								// Fire
+								_ansiStreamChunkReceived?.Invoke(this, args);
+							}
 						}
 					}
 				};
@@ -343,9 +368,9 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		/// Kills the process if it is running.
+		/// Kills the whole console emulator process if it is running. This also terminates the console emulator window.	// TODO: kill payload process only when we know its pid
 		/// </summary>
-		public void Kill()
+		public void KillConsoleEmulator()
 		{
 			try
 			{
@@ -359,7 +384,28 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		/// Fires when the console emulator process exits and stops rendering the terminal view. Note that the root command might have had stopped running long before this moment if <see cref="ConEmuStartInfo.IsKeepingTerminalOnCommandExit" /> prevents terminating the terminal view immediately.
+		///     <para>Fires when the console process writes into its output or error stream. Gets a chunk of the raw ANSI stream contents.</para>
+		///     <para>For processes which write immediately on startup, this event might fire some chunks before you sink it. To get notified reliably, use <see cref="ConEmuStartInfo.AnsiStreamChunkReceivedEventSink" />.</para>
+		///     <para>To enable sinking this event, you must have <see cref="ConEmuStartInfo.IsReadingAnsiStream" /> set to <c>True</c> before starting the console process.</para>
+		/// </summary>
+		[SuppressMessage("ReSharper", "DelegateSubtraction")]
+		public event EventHandler<AnsiStreamChunkEventArgs> AnsiStreamChunkReceived
+		{
+			add
+			{
+				if(!_startinfo.IsReadingAnsiStream)
+					throw new InvalidOperationException("You cannot receive the ANSI stream data because the console process has not been set up to read the ANSI stream before running; set ConEmuStartInfo::IsReadingAnsiStream to True before starting the process.");
+				_ansiStreamChunkReceived += value;
+			}
+			remove
+			{
+				_ansiStreamChunkReceived -= value;
+			}
+		}
+
+		/// <summary>
+		///     <para>Fires when the console emulator process exits and stops rendering the terminal view. Note that the root command might have had stopped running long before this moment if <see cref="ConEmuStartInfo.IsKeepingTerminalOnCommandExit" /> prevents terminating the terminal view immediately.</para>
+		///     <para>For short-lived processes, this event might fire before you sink it. To get notified reliably, use <see cref="ConEmuStartInfo.ConsoleEmulatorExitedEventSink" />.</para>
 		/// </summary>
 		public event EventHandler ConsoleEmulatorExited;
 
@@ -407,7 +453,8 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		/// Fires when the payload command exits within the terminal. If <see cref="ConEmuStartInfo.IsKeepingTerminalOnCommandExit" />, the terminal stays, otherwise it closes also.
+		///     <para>Fires when the payload command exits within the terminal. If <see cref="ConEmuStartInfo.IsKeepingTerminalOnCommandExit" />, the terminal stays, otherwise it closes also.</para>
+		///     <para>For short-lived processes, this event might fire before you sink it. To get notified reliably, use <see cref="ConEmuStartInfo.PayloadExitedEventSink" />.</para>
 		/// </summary>
 		public event EventHandler PayloadExited;
 

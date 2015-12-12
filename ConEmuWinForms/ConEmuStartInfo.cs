@@ -13,7 +13,9 @@ namespace ConEmu.WinForms
 	/// </summary>
 	public sealed class ConEmuStartInfo
 	{
-		private StreamReader _ansireader;
+		private EventHandler<AnsiStreamChunkEventArgs> _ansiStreamChunkReceivedEventSink;
+
+		private EventHandler _consoleEmulatorExitedEventSink;
 
 		readonly IDictionary<string, string> _environment = new Dictionary<string, string>();
 
@@ -21,7 +23,11 @@ namespace ConEmu.WinForms
 
 		private bool _isKeepingTerminalOnCommandExit = true;
 
+		private bool _isReadingAnsiStream;
+
 		private bool _isUsedUp;
+
+		private EventHandler _payloadExitedEventSink;
 
 		[NotNull]
 		private string _sConEmuConsoleExtenderExecutablePath = "";
@@ -36,6 +42,24 @@ namespace ConEmu.WinForms
 		public ConEmuStartInfo()
 		{
 			ConEmuExecutablePath = InitConEmuLocation();
+		}
+
+		/// <summary>
+		///     <para>Gets or sets an event sink for <see cref="ConEmuSession.AnsiStreamChunkReceived" /> to get reliably notified even for data written by the console process on its very startup.</para>
+		///     <para>Settings this to a non-<c>NULL</c> value also implies on </para>
+		/// </summary>
+		[CanBeNull]
+		public EventHandler<AnsiStreamChunkEventArgs> AnsiStreamChunkReceivedEventSink
+		{
+			get
+			{
+				return _ansiStreamChunkReceivedEventSink;
+			}
+			set
+			{
+				AssertNotUsedUp();
+				_ansiStreamChunkReceivedEventSink = value;
+			}
 		}
 
 		/// <summary>
@@ -88,24 +112,6 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		///     <para>Gets or sets the routine which will receive the raw ANSI stream of the console commands.</para>
-		///     <para>If <c>NULL</c>, then console ANSI output will not be collected.</para>
-		/// </summary>
-		[CanBeNull]
-		public StreamReader ConsoleAnsiStreamReader
-		{
-			get
-			{
-				return _ansireader;
-			}
-			set
-			{
-				AssertNotUsedUp();
-				_ansireader = value;
-			}
-		}
-
-		/// <summary>
 		///     <para>The command line to execute in the console emulator as the top-level process. The session terminates when this command exits.</para>
 		///     <para>The default is <see cref="ConEmuConstants.DefaultConsoleCommandLine" />.</para>
 		///     <para>This property cannot be changed when the process is running.</para>
@@ -121,6 +127,23 @@ namespace ConEmu.WinForms
 			{
 				AssertNotUsedUp();
 				_sConsoleCommandLine = value;
+			}
+		}
+
+		/// <summary>
+		///     <para>Gets or sets an event sink for <see cref="ConEmuSession.ConsoleEmulatorExited" /> to get reliably notified even for short-lived processes.</para>
+		/// </summary>
+		[CanBeNull]
+		public EventHandler ConsoleEmulatorExitedEventSink
+		{
+			get
+			{
+				return _consoleEmulatorExitedEventSink;
+			}
+			set
+			{
+				AssertNotUsedUp();
+				_consoleEmulatorExitedEventSink = value;
 			}
 		}
 
@@ -158,6 +181,43 @@ namespace ConEmu.WinForms
 			{
 				AssertNotUsedUp();
 				_isKeepingTerminalOnCommandExit = value;
+			}
+		}
+
+		/// <summary>
+		///     <para>Gets or sets whether the console emulator will be reading the raw ANSI stream of the console and firing the <see cref="ConEmuSession.AnsiStreamChunkReceived" /> events (and notifying <see cref="AnsiStreamChunkReceivedEventSink" />).</para>
+		///     <para>This can only be decided on before the console process starts.</para>
+		///     <para>Setting <see cref="AnsiStreamChunkReceivedEventSink" /> to a non-<c>NULL</c> value implies on a <c>True</c> value for this property.</para>
+		/// </summary>
+		public bool IsReadingAnsiStream
+		{
+			get
+			{
+				return _isReadingAnsiStream || (_ansiStreamChunkReceivedEventSink != null);
+			}
+			set
+			{
+				AssertNotUsedUp();
+				if((!value) && (_ansiStreamChunkReceivedEventSink != null))
+					throw new ArgumentOutOfRangeException(nameof(value), false, "Cannot turn IsReadingAnsiStream off when AnsiStreamChunkReceivedEventSink has a non-NULL value because it implies on a True value for this property.");
+				_isReadingAnsiStream = value;
+			}
+		}
+
+		/// <summary>
+		///     <para>Gets or sets an event sink for <see cref="ConEmuSession.PayloadExited" /> to get reliably notified even for short-lived processes.</para>
+		/// </summary>
+		[CanBeNull]
+		public EventHandler PayloadExitedEventSink
+		{
+			get
+			{
+				return _payloadExitedEventSink;
+			}
+			set
+			{
+				AssertNotUsedUp();
+				_payloadExitedEventSink = value;
 			}
 		}
 
@@ -278,10 +338,5 @@ namespace ConEmu.WinForms
 
 			return "";
 		}
-
-		/// <summary>
-		/// Delegate for <see cref="ConEmuStartInfo.ConsoleAnsiStreamReader" />.
-		/// </summary>
-		public delegate void StreamReader([NotNull] string chunk);
 	}
 }

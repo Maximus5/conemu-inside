@@ -15,8 +15,11 @@ namespace ConEmuInside
 
 			ConEmuControl conemu;
 			Controls.Add(conemu = new ConEmuControl() {Dock = DockStyle.Fill, MinimumSize = new Size(200, 200), IsStatusbarVisible = true});
-			conemu.AutoStartInfo.SetEnv("one", "two");
-			conemu.AutoStartInfo.SetEnv("geet", "huub");
+			if(conemu.AutoStartInfo != null)
+			{
+				conemu.AutoStartInfo.SetEnv("one", "two");
+				conemu.AutoStartInfo.SetEnv("geet", "huub");
+			}
 			conemu.AutoStartInfo = null;
 			TextBox txt;
 			Controls.Add(txt = new TextBox() {Text = "AnotherFocusableControl", AutoSize = true, Dock = DockStyle.Top});
@@ -50,7 +53,7 @@ namespace ConEmuInside
 				}
 				if(txtOutput == null)
 					Controls.Add(txtOutput = new TextBox() {Multiline = true, Dock = DockStyle.Right, Width = 200});
-				conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "cmd.exe /c whois microsoft.com && ECHO ERRORLEVEL=%ERRORLEVEL%", ConsoleAnsiStreamReader = chunk => txtOutput.Text += chunk});
+				conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "cmd.exe /c whois microsoft.com && ECHO ERRORLEVEL=%ERRORLEVEL%", AnsiStreamChunkReceivedEventSink = (sender, args) => txtOutput.Text += args.GetMbcsText()});
 			};
 		}
 	}
