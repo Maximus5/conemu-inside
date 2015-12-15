@@ -241,9 +241,11 @@ namespace ConEmuInside
             sRunAs = argRunAs.Checked ? " -cur_console:a" : "";
 
             sRunArgs =
+                (argDebug.Checked ? " -debugw" : "") +
                 " -InsideWnd 0x" + termPanel.Handle.ToString("X") +
                 " -LoadCfgFile \"" + argXmlFile.Text + "\"" +
                 " -Dir \"" + argDirectory.Text + "\"" +
+                (argLog.Checked ? " -Log" : "") +
                 " -cmd " + // This one MUST be the last switch
                 argCmdLine.Text + sRunAs // And the shell command line itself
                 ;

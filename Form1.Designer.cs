@@ -53,6 +53,8 @@
             this.timer1 = new System.Windows.Forms.Timer(this.components);
             this.openFileDialog1 = new System.Windows.Forms.OpenFileDialog();
             this.folderBrowserDialog1 = new System.Windows.Forms.FolderBrowserDialog();
+            this.argDebug = new System.Windows.Forms.CheckBox();
+            this.argLog = new System.Windows.Forms.CheckBox();
             this.groupBox1.SuspendLayout();
             this.startPanel.SuspendLayout();
             this.groupBox2.SuspendLayout();
@@ -77,6 +79,8 @@
             this.startPanel.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.startPanel.BackColor = System.Drawing.SystemColors.ButtonFace;
+            this.startPanel.Controls.Add(this.argLog);
+            this.startPanel.Controls.Add(this.argDebug);
             this.startPanel.Controls.Add(this.label4);
             this.startPanel.Controls.Add(this.xmlBtn);
             this.startPanel.Controls.Add(this.argXmlFile);
@@ -93,7 +97,7 @@
             this.startPanel.Controls.Add(this.label1);
             this.startPanel.Location = new System.Drawing.Point(9, 17);
             this.startPanel.Name = "startPanel";
-            this.startPanel.Size = new System.Drawing.Size(558, 158);
+            this.startPanel.Size = new System.Drawing.Size(558, 191);
             this.startPanel.TabIndex = 0;
             this.startPanel.Text = "Start parameters";
             // 
@@ -129,7 +133,7 @@
             // startBtn
             // 
             this.startBtn.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.startBtn.Location = new System.Drawing.Point(350, 123);
+            this.startBtn.Location = new System.Drawing.Point(117, 151);
             this.startBtn.Name = "startBtn";
             this.startBtn.Size = new System.Drawing.Size(169, 23);
             this.startBtn.TabIndex = 11;
@@ -311,6 +315,26 @@
             // 
             this.folderBrowserDialog1.Description = "Choose working directory";
             // 
+            // argDebug
+            // 
+            this.argDebug.AutoSize = true;
+            this.argDebug.Location = new System.Drawing.Point(256, 128);
+            this.argDebug.Name = "argDebug";
+            this.argDebug.Size = new System.Drawing.Size(111, 17);
+            this.argDebug.TabIndex = 15;
+            this.argDebug.Text = "Wait for debugger";
+            this.argDebug.UseVisualStyleBackColor = true;
+            // 
+            // argLog
+            // 
+            this.argLog.AutoSize = true;
+            this.argLog.Location = new System.Drawing.Point(383, 128);
+            this.argLog.Name = "argLog";
+            this.argLog.Size = new System.Drawing.Size(108, 17);
+            this.argLog.TabIndex = 16;
+            this.argLog.Text = "ConEmu LogFiles";
+            this.argLog.UseVisualStyleBackColor = true;
+            // 
             // ChildTerminal
             // 
             this.AcceptButton = this.startBtn;
@@ -358,6 +382,8 @@
         private System.Windows.Forms.Label label4;
         private System.Windows.Forms.Button xmlBtn;
         private System.Windows.Forms.TextBox argXmlFile;
+        private System.Windows.Forms.CheckBox argLog;
+        private System.Windows.Forms.CheckBox argDebug;
     }
 }
 
