@@ -242,6 +242,7 @@ namespace ConEmuInside
 
             sRunArgs =
                 (argDebug.Checked ? " -debugw" : "") +
+                " -NoKeyHooks" +
                 " -InsideWnd 0x" + termPanel.Handle.ToString("X") +
                 " -LoadCfgFile \"" + argXmlFile.Text + "\"" +
                 " -Dir \"" + argDirectory.Text + "\"" +
