@@ -68,6 +68,9 @@ namespace ConEmu.WinForms
 			cmdl.AppendSwitch("-InsideWnd");
 			cmdl.AppendFileNameIfNotNull("0x" + ((ulong)hostcontext.HWndParent).ToString("X"));
 
+			// Don't use keyboard hooks in ConEmu when embedded
+			cmdl.AppendSwitch("-NoKeyHooks");
+
 			// Basic settings, like fonts and hidden tab bar
 			// Plus some of the properties on this class
 			cmdl.AppendSwitch("-LoadCfgFile");
@@ -95,6 +98,7 @@ namespace ConEmu.WinForms
 			cmdl.AppendSwitch("-cmd");
 
 			// Console mode command
+			// NOTE: if placed AFTER the payload command line, otherwise somehow conemu hooks won't fetch the switch out of the cmdline, e.g. with some complicated git fetch/push cmdline syntax which has a lot of colons inside on itself
 			cmdl.AppendSwitchIfNotNull("-cur_console:", $"{(startinfo.IsElevated ? "a" : "")}{(startinfo.IsKeepingTerminalOnCommandExit ? "c" : "")}");
 
 			// And the shell command line itself
