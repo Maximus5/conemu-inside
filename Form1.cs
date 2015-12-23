@@ -15,6 +15,7 @@ namespace ConEmuInside
     public partial class ChildTerminal : Form
     {
         protected Process ConEmu;
+        protected GuiMacro guiMacro;
 
         public ChildTerminal()
         {
@@ -106,7 +107,7 @@ namespace ConEmuInside
             return "ConEmu.exe";
         }
 
-        private string GetConEmuC()
+        private string GetConEmuCD()
         {
             // Returns Path to ConEmuC (to GuiMacro execution)
 
@@ -115,36 +116,51 @@ namespace ConEmuInside
             if (ConEmu.Modules.Count == 0)
                 return null;
 
-            String lsExeDir, ConEmuC;
+            string lsDll = (IntPtr.Size == 8) ? "ConEmuCD64.dll" : "ConEmuCD.dll";
+
+            String lsExeDir, ConEmuCD;
             lsExeDir = Path.GetDirectoryName(ConEmu.Modules[0].FileName);
-            ConEmuC = Path.Combine(lsExeDir, @"ConEmu\ConEmuC.exe");
-            if (!File.Exists(ConEmuC))
+            ConEmuCD = Path.Combine(lsExeDir, "ConEmu\\" + lsDll);
+            if (!File.Exists(ConEmuCD))
             {
-                ConEmuC = Path.Combine(lsExeDir, @"ConEmuC.exe");
-                if (!File.Exists(ConEmuC))
+                ConEmuCD = Path.Combine(lsExeDir, lsDll);
+                if (!File.Exists(ConEmuCD))
                 {
-                    ConEmuC = "ConEmuC.exe"; // Must not get here actually
+                    ConEmuCD = lsDll; // Must not get here actually
                 }
             }
-            return ConEmuC;
+            return ConEmuCD;
         }
 
         private void ExecuteGuiMacro(string asMacro)
         {
             // conemuc.exe -silent -guimacro:1234 print("\e","git"," --version","\n")
-            string ConEmuC = GetConEmuC();
-            if (ConEmuC != null)
+            string ConEmuCD = GetConEmuCD();
+            if (ConEmuCD == null)
             {
-                ProcessStartInfo macro = new ProcessStartInfo(
-                   ConEmuC,
-                   " -GuiMacro:" + ConEmu.Id.ToString() +
-                     " " +
-                     asMacro
-                    );
-                macro.WindowStyle = ProcessWindowStyle.Hidden;
-                macro.CreateNoWindow = true;
-                Process.Start(macro);
+                throw new GuiMacroException("ConEmuCD must not be null");
             }
+
+            if (guiMacro != null && guiMacro.LibraryPath != ConEmuCD)
+            {
+                guiMacro = null;
+            }
+
+            if (guiMacro == null)
+            {
+                try
+                {
+                    guiMacro = new GuiMacro(ConEmuCD);
+                }
+                catch (GuiMacroException e)
+                {
+                    MessageBox.Show(e.Message, "GuiMacroException", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+            }
+
+            //TODO: It must return string result in theory
+            guiMacro.Execute(ConEmu.Id.ToString(), asMacro);
         }
 
         private void printBtn_Click(object sender, EventArgs e)
