@@ -55,7 +55,7 @@ namespace ConEmuInside
 
             // TODO: ConsoleMain3 uses pipes to output result
             // TODO: It may be better to improve ConEmuCD than implement pipes here?
-            long iRc = ConsoleMain3.Invoke(0, cmdLine);
+            int iRc = ConsoleMain3.Invoke(0, cmdLine);
             switch (iRc)
             {
                 case 200: case 201:
