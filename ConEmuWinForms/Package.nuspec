@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>ConEmu.Control.WinForms</id>
-    <version>15.12.10</version>
+    <version>15.12.22</version>
     <title>Windows Forms Control Embedding for ConEmu Console Emulator</title>
     <authors>Maximus5,hypersw</authors>
     <owners>Maximus5,hypersw</owners>
@@ -16,7 +16,7 @@
     </description>
     <licenseUrl>https://opensource.org/licenses/BSD-3-Clause</licenseUrl>
     <dependencies>
-      <dependency id="ConEmu.Console" version="[15.12.10,)" />
+      <dependency id="ConEmu.Core" version="[15.12.22,)" />
     </dependencies>
   </metadata>
   <files>
