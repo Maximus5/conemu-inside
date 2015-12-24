@@ -146,21 +146,18 @@ namespace ConEmuInside
                 guiMacro = null;
             }
 
-            if (guiMacro == null)
+            string lsResult;
+            try
             {
-                try
-                {
+                if (guiMacro == null)
                     guiMacro = new GuiMacro(ConEmuCD);
-                }
-                catch (GuiMacroException e)
-                {
-                    MessageBox.Show(e.Message, "GuiMacroException", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
+                lsResult = guiMacro.Execute(ConEmu.Id.ToString(), asMacro);
+                Debugger.Log(0, "GuiMacroResult", lsResult+"\n");
             }
-
-            //TODO: It must return string result in theory
-            guiMacro.Execute(ConEmu.Id.ToString(), asMacro);
+            catch (GuiMacroException e)
+            {
+                MessageBox.Show(e.Message, "GuiMacroException", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void printBtn_Click(object sender, EventArgs e)
