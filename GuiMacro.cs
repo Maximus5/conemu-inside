@@ -53,16 +53,28 @@ namespace ConEmuInside
                 cmdLine += ":" + asWhere;
             cmdLine += " " + asMacro;
 
-            // TODO: ConsoleMain3 uses pipes to output result
-            // TODO: It may be better to improve ConEmuCD than implement pipes here?
-            int iRc = ConsoleMain3.Invoke(0, cmdLine);
+            Environment.SetEnvironmentVariable("ConEmuMacroResult", null);
+
+            string result;
+            int iRc = ConsoleMain3.Invoke(3, cmdLine);
             switch (iRc)
             {
-                case 200: case 201:
+                case 200: // CERR_CMDLINEEMPTY
+                case 201: // CERR_CMDLINE
                     throw new GuiMacroException("Bad command line was passed to ConEmuCD");
+                case 0: // This is expected
+                case 133: // CERR_GUIMACRO_SUCCEEDED: not expected, but...
+                    result = Environment.GetEnvironmentVariable("ConEmuMacroResult");
+                    if (result == null)
+                        throw new GuiMacroException("ConEmuMacroResult was not set");
+                    break;
+                case 134: // CERR_GUIMACRO_FAILED
+                    throw new GuiMacroException("GuiMacro execution failed");
+                default:
+                    throw new GuiMacroException(string.Format("Internal ConEmuCD error: {0}", iRc));
             }
 
-            return iRc.ToString();
+            return result;
         }
 
         public GuiMacro(string asLibrary)
