@@ -103,7 +103,7 @@ namespace ConEmu.WinForms
 			switch(startinfo.WhenPayloadProcessExits)
 			{
 			case WhenPayloadProcessExits.CloseTerminal:
-				sConsoleExitMode = "";
+				sConsoleExitMode = "n";
 				break;
 			case WhenPayloadProcessExits.KeepTerminal:
 				sConsoleExitMode = "c0";
