@@ -99,7 +99,22 @@ namespace ConEmu.WinForms
 
 			// Console mode command
 			// NOTE: if placed AFTER the payload command line, otherwise somehow conemu hooks won't fetch the switch out of the cmdline, e.g. with some complicated git fetch/push cmdline syntax which has a lot of colons inside on itself
-			cmdl.AppendSwitchIfNotNull("-cur_console:", $"{(startinfo.IsElevated ? "a" : "")}{(startinfo.IsKeepingTerminalOnCommandExit ? "c" : "")}");
+			string sConsoleExitMode;
+			switch(startinfo.WhenPayloadProcessExits)
+			{
+			case WhenPayloadProcessExits.CloseTerminal:
+				sConsoleExitMode = "";
+				break;
+			case WhenPayloadProcessExits.KeepTerminal:
+				sConsoleExitMode = "c0";
+				break;
+			case WhenPayloadProcessExits.KeepTerminalAndShowMessage:
+				sConsoleExitMode = "c";
+				break;
+			default:
+				throw new ArgumentOutOfRangeException("ConEmuStartInfo" + "::" + "WhenPayloadProcessExits", startinfo.WhenPayloadProcessExits, "This is not a valid enum value.");
+			}
+			cmdl.AppendSwitchIfNotNull("-cur_console:", $"{(startinfo.IsElevated ? "a" : "")}{sConsoleExitMode}");
 
 			// And the shell command line itself
 			cmdl.AppendSwitch(startinfo.ConsoleCommandLine);

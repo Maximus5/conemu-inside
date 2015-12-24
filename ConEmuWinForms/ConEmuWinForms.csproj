@@ -62,6 +62,7 @@
     </Compile>
     <Compile Include="States.cs" />
     <Compile Include="Util\CommandLineBuilder.cs" />
+    <Compile Include="WhenPayloadProcessExits.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="ConEmu.xml" />

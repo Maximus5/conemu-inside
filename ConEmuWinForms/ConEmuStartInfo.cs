@@ -21,8 +21,6 @@ namespace ConEmu.WinForms
 
 		private bool _isElevated;
 
-		private bool _isKeepingTerminalOnCommandExit = true;
-
 		private bool _isReadingAnsiStream;
 
 		private bool _isUsedUp;
@@ -38,6 +36,8 @@ namespace ConEmu.WinForms
 		private string _sConsoleCommandLine = ConEmuConstants.DefaultConsoleCommandLine;
 
 		private string _sStartupDirectory;
+
+		private WhenPayloadProcessExits _whenPayloadProcessExits = WhenPayloadProcessExits.KeepTerminalAndShowMessage;
 
 		public ConEmuStartInfo()
 		{
@@ -166,25 +166,6 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		///     <para>Gets or sets whether the terminal emulator view should keep displaying the last contents after the console process specified in <see cref="ConsoleCommandLine" /> exits.</para>
-		///     <para>If <c>False</c>, the console emulator view closes and control background is displayed immediately upon process exit.</para>
-		///     <para>The default is <c>True</c>.</para>
-		///     <para>This property cannot be changed when the process is running.</para>
-		/// </summary>
-		public bool IsKeepingTerminalOnCommandExit
-		{
-			get
-			{
-				return _isKeepingTerminalOnCommandExit;
-			}
-			set
-			{
-				AssertNotUsedUp();
-				_isKeepingTerminalOnCommandExit = value;
-			}
-		}
-
-		/// <summary>
 		///     <para>Gets or sets whether the console emulator will be reading the raw ANSI stream of the console and firing the <see cref="ConEmuSession.AnsiStreamChunkReceived" /> events (and notifying <see cref="AnsiStreamChunkReceivedEventSink" />).</para>
 		///     <para>This can only be decided on before the console process starts.</para>
 		///     <para>Setting <see cref="AnsiStreamChunkReceivedEventSink" /> to a non-<c>NULL</c> value implies on a <c>True</c> value for this property.</para>
@@ -235,6 +216,25 @@ namespace ConEmu.WinForms
 			{
 				AssertNotUsedUp();
 				_sStartupDirectory = value;
+			}
+		}
+
+		/// <summary>
+		///     <para>Gets or sets whether the terminal emulator view should keep displaying the last contents after the console process specified in <see cref="ConsoleCommandLine" /> exits.</para>
+		///     <para>See comments on enum members for details on specific behavior.</para>
+		///     <para>The default is <see cref="WinForms.WhenPayloadProcessExits.KeepTerminalAndShowMessage" />.</para>
+		///     <para>This property cannot be changed when the process is running.</para>
+		/// </summary>
+		public WhenPayloadProcessExits WhenPayloadProcessExits
+		{
+			get
+			{
+				return _whenPayloadProcessExits;
+			}
+			set
+			{
+				AssertNotUsedUp();
+				_whenPayloadProcessExits = value;
 			}
 		}
 
