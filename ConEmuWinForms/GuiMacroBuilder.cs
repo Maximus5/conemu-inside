@@ -44,6 +44,14 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
+		/// Renders the macro and executes with ConEmu, getting the result synchronously.
+		/// </summary>
+		public GuiMacroResult ExecuteSync()
+		{
+			return _owner.ExecuteGuiMacroTextSync(ConEmuLogic.RenderMacroCommand(_sMacroName, _parameters));
+		}
+
+		/// <summary>
 		/// Adds a parameter.
 		/// </summary>
 		[NotNull]

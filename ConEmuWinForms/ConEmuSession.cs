@@ -5,7 +5,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Windows.Forms;
 using System.Xml;
 
@@ -20,6 +19,8 @@ namespace ConEmu.WinForms
 	/// </summary>
 	public unsafe class ConEmuSession
 	{
+		static readonly bool IsExecutingGuiMacrosInProcess = false;
+
 		EventHandler<AnsiStreamChunkEventArgs> _ansiStreamChunkReceived;
 
 		[NotNull]
@@ -29,6 +30,11 @@ namespace ConEmu.WinForms
 		private readonly WindowsFormsSynchronizationContext _dispatcher;
 
 		bool _isPayloadExited;
+
+		/// <summary>
+		/// The exit code of the payload process, if it has already exited (<see cref="_isPayloadExited" />). Otherwise, undefined behavior.
+		/// </summary>
+		private int _nPayloadExitCode;
 
 		/// <summary>
 		/// The ConEmu process, even after it exits.
@@ -47,14 +53,14 @@ namespace ConEmu.WinForms
 				throw new ArgumentNullException(nameof(hostcontext));
 			_startinfo = startinfo;
 			startinfo.MarkAsUsedUp();
+			if(string.IsNullOrEmpty(startinfo.ConsoleCommandLine))
+				throw new InvalidOperationException($"Cannot start a new console process for command line “{startinfo.ConsoleCommandLine}” because it's either NULL, or empty, or whitespace.");
 
+			// Global environment
 			_dispatcher = new WindowsFormsSynchronizationContext();
 			_dirLocalTempRoot = new DirectoryInfo(Path.Combine(Path.Combine(Path.GetTempPath(), "ConEmu"), $"{DateTime.UtcNow.ToString("s").Replace(':', '-')}.{Process.GetCurrentProcess().Id:X8}.{unchecked((uint)RuntimeHelpers.GetHashCode(this)):X8}")); // Prefixed with date-sortable; then PID; then sync table id of this object
 
-			if(string.IsNullOrEmpty(startinfo.ConsoleCommandLine))
-				throw new InvalidOperationException("Cannot start a new console process for command line “{0}” because it's either NULL, or empty, or whitespace.");
-
-			// Events wiring
+			// Events wiring: make sure sinks pre-installed with start-info also get notified
 			if(startinfo.AnsiStreamChunkReceivedEventSink != null)
 				_ansiStreamChunkReceived += startinfo.AnsiStreamChunkReceivedEventSink;
 			if(startinfo.PayloadExitedEventSink != null)
@@ -62,6 +68,199 @@ namespace ConEmu.WinForms
 			if(startinfo.ConsoleEmulatorExitedEventSink != null)
 				ConsoleEmulatorExited += startinfo.ConsoleEmulatorExitedEventSink;
 
+			// Should feed ANSI log?
+			DirectoryInfo dirAnsiLog = null; // The flag which activates all ansi-stream-related features 
+			if(startinfo.IsReadingAnsiStream)
+			{
+				dirAnsiLog = _dirLocalTempRoot;
+				dirAnsiLog.Create();
+			}
+
+			// Cmdline
+			CommandLineBuilder cmdl = Init_MakeConEmuCommandLine(startinfo, hostcontext, dirAnsiLog);
+
+			// Multicast events for parts of functionality to wire up
+			EventHandler evtPolling = null;
+			EventHandler evtCleanupOnExit = null;
+
+			// Start ConEmu
+			try
+			{
+				if(string.IsNullOrEmpty(startinfo.ConEmuExecutablePath))
+					throw new InvalidOperationException("Could not run the console emulator. The path to ConEmu.exe could not be detected.");
+				if(!File.Exists(startinfo.ConEmuExecutablePath))
+					throw new InvalidOperationException($"Missing ConEmu executable at location “{startinfo.ConEmuExecutablePath}”.");
+				var processNew = new Process() {StartInfo = new ProcessStartInfo(startinfo.ConEmuExecutablePath, cmdl.ToString()) {UseShellExecute = false}};
+
+				// Bind process termination
+				processNew.EnableRaisingEvents = true;
+				processNew.Exited += delegate
+				{
+					_dispatcher.Post(o => // Ensure STA
+					{
+#pragma warning disable once AccessToModifiedClosure
+						evtCleanupOnExit?.Invoke(this, EventArgs.Empty);
+
+						// If we haven't separately caught an exit of the payload process
+						if(!_isPayloadExited)
+						{
+							_isPayloadExited = true;
+
+							// We haven't caught the exit of the payload process, so we haven't gotten a message with its errorlevel as well. Assume ConEmu propagates its exit code, as there ain't other way for getting it now
+							// TODO: check that this assumption holds
+							_nPayloadExitCode = _process.ExitCode;
+							PayloadExited?.Invoke(this, new ProcessExitedEventArgs(_nPayloadExitCode));
+						}
+
+						// All exited now
+						ConsoleEmulatorExited?.Invoke(this, EventArgs.Empty);
+					}, null);
+				};
+
+				if(!processNew.Start())
+					throw new Win32Exception("The process did not start.");
+				_process = processNew;
+			}
+			catch(Win32Exception ex)
+			{
+				throw new InvalidOperationException("Could not run the console emulator. " + ex.Message + $" ({ex.NativeErrorCode:X8})" + Environment.NewLine + Environment.NewLine + "Command:" + Environment.NewLine + startinfo.ConEmuExecutablePath + Environment.NewLine + Environment.NewLine + "Arguments:" + Environment.NewLine + cmdl, ex);
+			}
+
+			// All evt* multicast events are condidered clean up to this point, so if the process fails to start, no polling/cleanup will be fired yet (and user gets notified via an exception)
+			// From this point on, we MUST guarantee reliable firing of events
+
+			// GuiMacro executor & cleanup
+			_guiMacroExecutor = new GuiMacroExecutor(startinfo.ConEmuConsoleServerExecutablePath);
+			evtCleanupOnExit += delegate { ((IDisposable)_guiMacroExecutor).Dispose(); };
+
+			// Monitor payload process
+			Init_PayloadProcessMonitoring(ref evtPolling);
+
+			// Attach reading ANSI log and firing events
+			if(dirAnsiLog != null)
+				Init_AttachAnsiLog(dirAnsiLog, ref evtPolling, ref evtCleanupOnExit);
+
+			///////////////////////////////
+			// Set up the polling event
+			// NOTE: for now, this will be a polling timer, consider free-threaded treatment later on
+			var timer = new Timer() {Interval = (int)TimeSpan.FromSeconds(.1).TotalMilliseconds, Enabled = true};
+			timer.Tick += delegate
+			{
+				evtPolling?.Invoke(this, EventArgs.Empty);
+				if(_process.HasExited)
+				{
+					evtPolling = null; // Timer might fire a few more fake events on disposal
+					timer.Dispose();
+				}
+			};
+			evtCleanupOnExit += delegate { timer.Dispose(); };
+
+			// Schedule cleanup of temp files
+			evtCleanupOnExit += delegate
+			{
+				try
+				{
+					if(_dirLocalTempRoot.Exists)
+						_dirLocalTempRoot.Delete(true);
+				}
+				catch(Exception)
+				{
+					// Not interested
+				}
+			};
+		}
+
+		/// <summary>
+		/// Watches for the status of the payload process to fetch its exitcode when done and notify user of that.
+		/// </summary>
+		private void Init_PayloadProcessMonitoring([NotNull] ref EventHandler evtPolling)
+		{
+			var xmlDoc = new XmlDocument();
+
+			// Detect when payload process exits
+			Process processRoot = null; // After we know the root payload process PID, we'd wait for it to exit
+			DateTime timeLastAskedForRootPid = DateTime.MinValue;
+			evtPolling += delegate
+			{
+				if(_isPayloadExited)
+					return;
+				if(_process.HasExited)
+					return;
+
+				// Know root already?
+				if(processRoot != null)
+				{
+					if(!processRoot.HasExited)
+						return; // We know the root, and it has not exited yet. No use in re-asking anything.
+
+					processRoot = null; // Has exited => force a re-ask, we'd get its exit code from there
+				}
+
+				// Query on the root process
+				if(processRoot == null)
+				{
+					try
+					{
+						// Get info on the root payload process
+						GuiMacroResult result = BeginGuiMacro("GetInfo").WithParam("Root").ExecuteSync();
+
+						if(result.ErrorLevel != 0) // E.g. ConEmu has not fully started yet, and ConEmuC failed to connect to the instance — would usually return an error on the first call
+							return;
+						if(string.IsNullOrEmpty(result.Response)) // Might yield an empty string randomly if not ready yet
+							return;
+
+						// Interpret the string as XML
+						xmlDoc.LoadXml(result.Response);
+
+						XmlElement xmlRoot = xmlDoc.DocumentElement;
+						if(xmlRoot == null)
+							return;
+
+						Trace.WriteLine($"ROOT: {xmlRoot.OuterXml}");
+					}
+					catch
+					{
+						// Don't want to break the whole process, and got no exception reporter here => skip nonfatal errors, assume it's a temporary problem, ask next time
+					}
+					/*
+					// Waiting for now process yet, ask the console
+					if(DateTime.UtcNow - timeLastAskedForRootPid > TimeSpan.FromSeconds(1)) // Only if not pending a fresh question
+					{
+						timeLastAskedForRootPid = DateTime.UtcNow;
+						BeginGuiMacro("GetInfo").WithParam("ActivePID").Execute(result =>
+						{
+							if(result.ErrorLevel != 0) 
+								return;
+							int nActivePid;
+							if(!int.TryParse(result.Response, out nActivePid))
+								return; // Not an int, that's not expected if errorlevel is 0
+							if(nActivePid == 0)
+							{
+								// Means no process is running in ConEmu, all done
+								_isPayloadExited = true;
+								PayloadExited?.Invoke(this, EventArgs.Empty);
+							}
+							else
+							{
+								// Got a process, wait for this process now
+								// Migth sink its Exited event (when we got Tasks here e.g.), but for now it's simpler to reuse the same polling timer
+								try
+								{
+									processRoot = Process.GetProcessById(nActivePid);
+								}
+								catch(Exception)
+								{
+									// Might be various access problems, or the process might have exited in between our getting its PID and attaching
+								}
+							}
+						});
+					}*/
+				}
+			};
+		}
+
+		private CommandLineBuilder Init_MakeConEmuCommandLine(ConEmuStartInfo startinfo, HostContext hostcontext, DirectoryInfo dirAnsiLog)
+		{
 			var cmdl = new CommandLineBuilder();
 
 			// This sets up hosting of ConEmu in our control
@@ -74,7 +273,7 @@ namespace ConEmu.WinForms
 			// Basic settings, like fonts and hidden tab bar
 			// Plus some of the properties on this class
 			cmdl.AppendSwitch("-LoadCfgFile");
-			cmdl.AppendFileNameIfNotNull(EmitConfigFile(_dirLocalTempRoot, startinfo, hostcontext));
+			cmdl.AppendFileNameIfNotNull(Init_MakeConEmuCommandLine_EmitConfigFile(_dirLocalTempRoot, startinfo, hostcontext));
 
 			if(!string.IsNullOrEmpty(startinfo.StartupDirectory))
 			{
@@ -82,14 +281,9 @@ namespace ConEmu.WinForms
 				cmdl.AppendFileNameIfNotNull(startinfo.StartupDirectory);
 			}
 
-			// Write console buffer output to a file
-			DirectoryInfo dirAnsiLog = null;
-			if(startinfo.IsReadingAnsiStream)
+			// ANSI Log file
+			if(dirAnsiLog != null)
 			{
-				dirAnsiLog = _dirLocalTempRoot;
-				dirAnsiLog.Create();
-
-				// Submit to ConEmu
 				cmdl.AppendSwitch("-AnsiLog");
 				cmdl.AppendFileNameIfNotNull(dirAnsiLog.FullName);
 			}
@@ -119,134 +313,10 @@ namespace ConEmu.WinForms
 			// And the shell command line itself
 			cmdl.AppendSwitch(startinfo.ConsoleCommandLine);
 
-			if(string.IsNullOrEmpty(startinfo.ConEmuExecutablePath))
-				throw new InvalidOperationException("Could not run the console emulator. The path to ConEmu.exe could not be detected.");
-
-			EventHandler evtPolling = null;
-			EventHandler evtCleanupOnExit = null;
-
-			// Start ConEmu
-			try
-			{
-				if(!File.Exists(startinfo.ConEmuExecutablePath))
-					throw new InvalidOperationException($"Missing ConEmu executable at location “{startinfo.ConEmuExecutablePath}”.");
-				var processNew = new Process() {StartInfo = new ProcessStartInfo(startinfo.ConEmuExecutablePath, cmdl.ToString()) {UseShellExecute = false}};
-
-				// Bind process termination
-				processNew.EnableRaisingEvents = true;
-				processNew.Exited += delegate
-				{
-					_dispatcher.Post(o => // Ensure STA
-					{
-#pragma warning disable once AccessToModifiedClosure
-						evtCleanupOnExit?.Invoke(this, EventArgs.Empty);
-
-						// Notify client on the proper thread
-						if(!_isPayloadExited)
-						{
-							_isPayloadExited = true;
-							PayloadExited?.Invoke(this, EventArgs.Empty);
-						}
-						ConsoleEmulatorExited?.Invoke(this, EventArgs.Empty);
-					}, null);
-				};
-
-				if(!processNew.Start())
-					throw new Win32Exception("The process did not start.");
-				_process = processNew;
-			}
-			catch(Win32Exception ex)
-			{
-				throw new InvalidOperationException("Could not run the console emulator. " + ex.Message + $" ({ex.NativeErrorCode:X8})" + Environment.NewLine + Environment.NewLine + "Command:" + Environment.NewLine + startinfo.ConEmuExecutablePath + Environment.NewLine + Environment.NewLine + "Arguments:" + Environment.NewLine + cmdl, ex);
-			}
-
-			// TODO: for now, this will be a polling timer, consider free-threaded treatment later on
-			var timer = new Timer() {Interval = (int)TimeSpan.FromSeconds(.1).TotalMilliseconds, Enabled = true};
-			timer.Tick += delegate
-			{
-				evtPolling?.Invoke(this, EventArgs.Empty);
-				if(_process.HasExited)
-				{
-					evtPolling = null; // Timer might fire a few more fake events on disposal
-					timer.Dispose();
-				}
-			};
-			evtCleanupOnExit += delegate { timer.Dispose(); };
-
-			// Attach reading ANSI log and firing events
-			if(dirAnsiLog != null)
-				AttachAnsiLog(dirAnsiLog, ref evtPolling, ref evtCleanupOnExit);
-
-			evtCleanupOnExit += delegate
-			{
-				// Cleanup any leftover temp files
-				try
-				{
-					if(_dirLocalTempRoot.Exists)
-						_dirLocalTempRoot.Delete(true);
-				}
-				catch(Exception)
-				{
-					// Not interested
-				}
-			};
-
-			// Detect when payload process exits
-			Process processWaitingFor = null; // We know the PID of the process running in the console, and are waiting for it to exit
-			DateTime timeLastAskedForActivePid = DateTime.MinValue;
-			evtPolling += delegate
-			{
-				if(_isPayloadExited)
-					return;
-				if(_process.HasExited)
-					return;
-				// We've seen an active process, check if it's exited
-				if(processWaitingFor != null)
-				{
-					if(processWaitingFor.HasExited)
-						processWaitingFor = null; // Means the former active process has exited, but we don't know if that were the top-level active process, could have been a child. So make a new request now and check if there's a new active process (or report exited if not)
-				}
-
-				// Don't know no active process, ask ConEmu on that matter
-				if(processWaitingFor == null)
-				{
-					// Waiting for now process yet, ask the console
-					if(DateTime.UtcNow - timeLastAskedForActivePid > TimeSpan.FromSeconds(1)) // Only if not pending a fresh question
-					{
-						timeLastAskedForActivePid = DateTime.UtcNow;
-						BeginGuiMacro("GetInfo").WithParam("ActivePID").Execute(result =>
-						{
-							if(result.ErrorLevel != 0) // E.g. ConEmu has not fully started yet, and ConEmuC failed to connect to the instance — would usually return an error on the first call
-								return;
-							int nActivePid;
-							if(!int.TryParse(result.Response, out nActivePid))
-								return; // Not an int, that's not expected if errorlevel is 0
-							if(nActivePid == 0)
-							{
-								// Means no process is running in ConEmu, all done
-								_isPayloadExited = true;
-								PayloadExited?.Invoke(this, EventArgs.Empty);
-							}
-							else
-							{
-								// Got a process, wait for this process now
-								// Migth sink its Exited event (when we got Tasks here e.g.), but for now it's simpler to reuse the same polling timer
-								try
-								{
-									processWaitingFor = Process.GetProcessById(nActivePid);
-								}
-								catch(Exception)
-								{
-									// Might be various access problems, or the process might have exited in between our getting its PID and attaching
-								}
-							}
-						});
-					}
-				}
-			};
+			return cmdl;
 		}
 
-		private void AttachAnsiLog([NotNull] DirectoryInfo dirAnsiLog, [NotNull] ref EventHandler evtPolling, [NotNull] ref EventHandler evtCleanupOnExit)
+		private void Init_AttachAnsiLog([NotNull] DirectoryInfo dirAnsiLog, [NotNull] ref EventHandler evtPolling, [NotNull] ref EventHandler evtCleanupOnExit)
 		{
 			if(dirAnsiLog == null)
 				throw new ArgumentNullException(nameof(dirAnsiLog));
@@ -324,16 +394,24 @@ namespace ConEmu.WinForms
 			};
 		}
 
-		public int ExitCode
+		/// <summary>
+		/// Gets the exit code of the payload process, if <see cref="IsPayloadExited">it has already exited</see>. Throws an exception if it has not.
+		/// </summary>
+		public int GetPayloadExitCode()
 		{
-			get
-			{
-				if(!_process.HasExited)
-					throw new InvalidOperationException("The exit code is not available yet because the process has not yet exited.");
-				return _process.ExitCode;
-			}
+			if(!_isPayloadExited)
+				throw new InvalidOperationException("The exit code is not available yet because the process has not yet exited.");
+			return _nPayloadExitCode;
 		}
 
+		/// <summary>
+		/// Gets whether the payload process has already exited (see <see cref="PayloadExited" />). The console emulator process might have exited as well, but might have not.
+		/// </summary>
+		public bool IsPayloadExited => _isPayloadExited;
+
+		/// <summary>
+		/// Gets the start info with which this session has been started.
+		/// </summary>
 		[NotNull]
 		public ConEmuStartInfo StartInfo
 		{
@@ -360,7 +438,8 @@ namespace ConEmu.WinForms
 		/// </summary>
 		/// <param name="macrotext">The full macro command, see http://conemu.github.io/en/GuiMacro.html .</param>
 		/// <param name="FWhenDone">Optional. Executes on the same thread when the macro is done executing.</param>
-		public void ExecuteGuiMacroText([NotNull] string macrotext, [CanBeNull] Action<GuiMacroResult> FWhenDone = null)
+		/// <param name="isSync">Forces synchronous execution. If <c>False</c>, the operation might be carried out async.</param>
+		public void ExecuteGuiMacroText([NotNull] string macrotext, [CanBeNull] Action<GuiMacroResult> FWhenDone = null, bool isSync = false)
 		{
 			if(macrotext == null)
 				throw new ArgumentNullException(nameof(macrotext));
@@ -369,52 +448,40 @@ namespace ConEmu.WinForms
 			if(processConEmu == null)
 				throw new InvalidOperationException("Cannot execute a macro because the console process is not running at the moment.");
 
-			// conemuc.exe -silent -guimacro:1234 print("\e","git"," --version","\n")
-			var cmdl = new CommandLineBuilder();
-			cmdl.AppendSwitch("-silent");
-			cmdl.AppendSwitchIfNotNull("-GuiMacro:", processConEmu.Id.ToString());
-			cmdl.AppendSwitch(macrotext /* appends the text unquoted for cmdline */);
-
-			string exe = _startinfo.ConEmuConsoleExtenderExecutablePath;
-			if(exe == "")
-				throw new InvalidOperationException("The ConEmu Console Extender Executable is not available.");
-			if(!File.Exists(exe))
-				throw new InvalidOperationException($"The ConEmu Console Extender Executable does not exist on disk at “{exe}”.");
-
-			try
+			if(IsExecutingGuiMacrosInProcess)
 			{
-				var processExtender = new Process() {StartInfo = new ProcessStartInfo(exe, cmdl.ToString()) {WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true, UseShellExecute = false}};
-				if(FWhenDone != null)
-				{
-					var sbResult = new StringBuilder();
-					processExtender.EnableRaisingEvents = true;
-					processExtender.Exited += delegate
-					{
-						GuiMacroResult result;
-						lock(sbResult)
-						{
-							result = new GuiMacroResult() {ErrorLevel = processExtender.ExitCode, Response = sbResult.ToString()};
-						}
-						_dispatcher.Post(delegate { FWhenDone(result); }, null);
-					};
-
-					DataReceivedEventHandler FOnData = (sender, args) =>
-					{
-						lock(sbResult)
-							sbResult.Append(args.Data);
-					};
-					processExtender.OutputDataReceived += FOnData;
-					processExtender.ErrorDataReceived += FOnData;
-				}
-				processExtender.Start();
-				processExtender.BeginOutputReadLine();
-				processExtender.BeginErrorReadLine();
+				GuiMacroResult result = _guiMacroExecutor.ExecuteInProcess(processConEmu.Id, macrotext);
+				FWhenDone?.Invoke(result);
 			}
-			catch(Exception ex)
-			{
-				throw new InvalidOperationException($"Could not run the ConEmu Console Extender Executable at “{exe}” with command-line arguments “{cmdl}”.", ex);
-			}
+			else
+				_guiMacroExecutor.ExecuteViaExtenderProcess(macrotext, FWhenDone, isSync, processConEmu.Id, _startinfo.ConEmuConsoleExtenderExecutablePath);
 		}
+
+		/// <summary>
+		/// Executes a ConEmu GUI Macro on the active console, see http://conemu.github.io/en/GuiMacro.html , synchronously.
+		/// </summary>
+		/// <param name="macrotext">The full macro command, see http://conemu.github.io/en/GuiMacro.html .</param>
+		public GuiMacroResult ExecuteGuiMacroTextSync([NotNull] string macrotext)
+		{
+			if(macrotext == null)
+				throw new ArgumentNullException(nameof(macrotext));
+
+			Process processConEmu = _process;
+			if(processConEmu == null)
+				throw new InvalidOperationException("Cannot execute a macro because the console process is not running at the moment.");
+
+			if(IsExecutingGuiMacrosInProcess)
+				return _guiMacroExecutor.ExecuteInProcess(processConEmu.Id, macrotext);
+
+			// Get result sync
+			GuiMacroResult? retval = null;
+			_guiMacroExecutor.ExecuteViaExtenderProcess(macrotext, result => retval = result, true, processConEmu.Id, _startinfo.ConEmuConsoleExtenderExecutablePath);
+			if(retval == null)
+				throw new InvalidOperationException("The GuiMacro has failed to execute and provide the result synchronously.");
+			return retval.Value;
+		}
+
+		readonly GuiMacroExecutor _guiMacroExecutor;
 
 		/// <summary>
 		/// Kills the whole console emulator process if it is running. This also terminates the console emulator window.	// TODO: kill payload process only when we know its pid
@@ -458,7 +525,7 @@ namespace ConEmu.WinForms
 		/// </summary>
 		public event EventHandler ConsoleEmulatorExited;
 
-		private static string EmitConfigFile([NotNull] DirectoryInfo dirForConfigFile, [NotNull] ConEmuStartInfo startinfo, [NotNull] HostContext hostcontext)
+		private static string Init_MakeConEmuCommandLine_EmitConfigFile([NotNull] DirectoryInfo dirForConfigFile, [NotNull] ConEmuStartInfo startinfo, [NotNull] HostContext hostcontext)
 		{
 			if(dirForConfigFile == null)
 				throw new ArgumentNullException(nameof(dirForConfigFile));
@@ -502,10 +569,10 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		///     <para>Fires when the payload command exits within the terminal. If <see cref="ConEmuStartInfo.IsKeepingTerminalOnCommandExit" />, the terminal stays, otherwise it closes also.</para>
+		///     <para>Fires when the payload command exits within the terminal. If not <see cref="WhenPayloadProcessExits.CloseTerminal" />, the terminal stays, otherwise it closes also.</para>
 		///     <para>For short-lived processes, this event might fire before you sink it. To get notified reliably, use <see cref="ConEmuStartInfo.PayloadExitedEventSink" />.</para>
 		/// </summary>
-		public event EventHandler PayloadExited;
+		public event EventHandler<ProcessExitedEventArgs> PayloadExited;
 
 		public class HostContext
 		{

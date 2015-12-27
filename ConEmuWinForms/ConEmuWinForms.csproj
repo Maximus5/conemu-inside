@@ -53,8 +53,10 @@
     <Compile Include="ConEmuLogic.cs" />
     <Compile Include="ConEmuSession.cs" />
     <Compile Include="ConEmuStartInfo.cs" />
+    <Compile Include="GuiMacroExecutor.cs" />
     <Compile Include="GuiMacroBuilder.cs" />
     <Compile Include="GuiMacroResult.cs" />
+    <Compile Include="ProcessExitedEventArgs.cs" />
     <Compile Include="Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
@@ -69,6 +71,7 @@
     <None Include="Package.nuspec">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources.resx">

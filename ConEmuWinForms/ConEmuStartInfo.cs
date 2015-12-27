@@ -25,10 +25,13 @@ namespace ConEmu.WinForms
 
 		private bool _isUsedUp;
 
-		private EventHandler _payloadExitedEventSink;
+		private EventHandler<ProcessExitedEventArgs> _payloadExitedEventSink;
 
 		[NotNull]
 		private string _sConEmuConsoleExtenderExecutablePath = "";
+
+		[NotNull]
+		private string _sConEmuConsoleServerExecutablePath = "";
 
 		[NotNull]
 		private string _sConEmuExecutablePath = "";
@@ -86,6 +89,29 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
+		/// Gets or sets the path to the ConEmu console server (<c>ConEmuCD.dll</c>). MUST match the processor architecture of the current process.
+		/// Will be autodetected from the path to this DLL or from <see cref="ConEmuExecutablePath" /> if possible.
+		/// </summary>
+		[NotNull]
+		public string ConEmuConsoleServerExecutablePath
+		{
+			get
+			{
+				return _sConEmuConsoleServerExecutablePath;
+			}
+			set
+			{
+				if(value == null)
+					throw new ArgumentNullException(nameof(value));
+				if((value == "") && (_sConEmuConsoleServerExecutablePath == ""))
+					return;
+				if(value == "")
+					throw new ArgumentOutOfRangeException(nameof(value), value, "Cannot reset path to an empty string.");
+				_sConEmuConsoleServerExecutablePath = value; // Delay existence check 'til we call it
+			}
+		}
+
+		/// <summary>
 		/// Gets or sets the path to the <c>ConEmu.exe</c> which will be the console emulator root process.
 		/// Will be autodetected from the path to this DLL if possible.
 		/// </summary>
@@ -108,6 +134,8 @@ namespace ConEmu.WinForms
 
 				if(_sConEmuConsoleExtenderExecutablePath == "")
 					_sConEmuConsoleExtenderExecutablePath = TryDeriveConEmuConsoleExtenderExecutablePath(_sConEmuExecutablePath);
+				if(_sConEmuConsoleServerExecutablePath == "")
+					_sConEmuConsoleServerExecutablePath = TryDeriveConEmuConsoleServerExecutablePath(_sConEmuExecutablePath);
 			}
 		}
 
@@ -189,7 +217,7 @@ namespace ConEmu.WinForms
 		///     <para>Gets or sets an event sink for <see cref="ConEmuSession.PayloadExited" /> to get reliably notified even for short-lived processes.</para>
 		/// </summary>
 		[CanBeNull]
-		public EventHandler PayloadExitedEventSink
+		public EventHandler<ProcessExitedEventArgs> PayloadExitedEventSink
 		{
 			get
 			{
@@ -332,7 +360,35 @@ namespace ConEmu.WinForms
 			if(File.Exists(candidate))
 				return candidate;
 
-			candidate = Path.Combine(Path.Combine(dir, ConEmuConstants.ConEmuSubfolderName), "ConEmuC.exe");
+			candidate = Path.Combine(Path.Combine(dir, ConEmuConstants.ConEmuSubfolderName), ConEmuConstants.ConEmuConsoleExtenderExeName);
+			if(File.Exists(candidate))
+				return candidate;
+
+			return "";
+		}
+
+		[NotNull]
+		private static string TryDeriveConEmuConsoleServerExecutablePath([NotNull] string sConEmuPath)
+		{
+			if(sConEmuPath == null)
+				throw new ArgumentNullException(nameof(sConEmuPath));
+			if(sConEmuPath == "")
+				return "";
+			string dir = Path.GetDirectoryName(sConEmuPath);
+			if(string.IsNullOrEmpty(dir))
+				return "";
+
+			// Make up the file name for the CPU arch of the current process, as we're gonna load it in-process
+			string sFileName = ConEmuConstants.ConEmuConsoleServerFileNameNoExt;
+			if(IntPtr.Size == 8)
+				sFileName += "64";
+			sFileName += ".dll";
+
+			string candidate = Path.Combine(dir, sFileName);
+			if(File.Exists(candidate))
+				return candidate;
+
+			candidate = Path.Combine(Path.Combine(dir, ConEmuConstants.ConEmuSubfolderName), sFileName);
 			if(File.Exists(candidate))
 				return candidate;
 

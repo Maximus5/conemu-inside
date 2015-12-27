@@ -180,7 +180,7 @@ namespace ConEmu.WinForms
 			{
 				try
 				{
-					_nLastExitCode = _running.ExitCode;
+					_nLastExitCode = _running.GetPayloadExitCode();
 				}
 				catch(Exception)
 				{
