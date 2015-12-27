@@ -5,6 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using System.Xml;
 
@@ -19,7 +20,7 @@ namespace ConEmu.WinForms
 	/// </summary>
 	public unsafe class ConEmuSession
 	{
-		static readonly bool IsExecutingGuiMacrosInProcess = false;
+		static readonly bool IsExecutingGuiMacrosInProcess = !true;
 
 		EventHandler<AnsiStreamChunkEventArgs> _ansiStreamChunkReceived;
 
@@ -134,7 +135,7 @@ namespace ConEmu.WinForms
 			evtCleanupOnExit += delegate { ((IDisposable)_guiMacroExecutor).Dispose(); };
 
 			// Monitor payload process
-			Init_PayloadProcessMonitoring(ref evtPolling);
+			Init_PayloadProcessMonitoring(ref evtPolling, ref evtCleanupOnExit);
 
 			// Attach reading ANSI log and firing events
 			if(dirAnsiLog != null)
@@ -173,13 +174,20 @@ namespace ConEmu.WinForms
 		/// <summary>
 		/// Watches for the status of the payload process to fetch its exitcode when done and notify user of that.
 		/// </summary>
-		private void Init_PayloadProcessMonitoring([NotNull] ref EventHandler evtPolling)
+		private void Init_PayloadProcessMonitoring(ref EventHandler evtPolling, ref EventHandler evtCleanupOnExit)
 		{
 			var xmlDoc = new XmlDocument();
 
 			// Detect when payload process exits
 			Process processRoot = null; // After we know the root payload process PID, we'd wait for it to exit
-			DateTime timeLastAskedForRootPid = DateTime.MinValue;
+			evtCleanupOnExit += delegate
+			{
+				if(processRoot != null)
+				{
+					processRoot.Close();
+					processRoot = null;
+				}
+			};
 			evtPolling += delegate
 			{
 				if(_isPayloadExited)
@@ -193,6 +201,7 @@ namespace ConEmu.WinForms
 					if(!processRoot.HasExited)
 						return; // We know the root, and it has not exited yet. No use in re-asking anything.
 
+					processRoot.Close();
 					processRoot = null; // Has exited => force a re-ask, we'd get its exit code from there
 				}
 
@@ -210,6 +219,7 @@ namespace ConEmu.WinForms
 							return;
 
 						// Interpret the string as XML
+						/*
 						xmlDoc.LoadXml(result.Response);
 
 						XmlElement xmlRoot = xmlDoc.DocumentElement;
@@ -217,44 +227,40 @@ namespace ConEmu.WinForms
 							return;
 
 						Trace.WriteLine($"ROOT: {xmlRoot.OuterXml}");
+*/
+
+						// Current possible records:
+						// <Root	"Name"="cmd.exe"/>
+						// <Root	"Name"="cmd.exe"	"Running": true	"PID""6812"	"ExitCode""259"	"UpTime"="7735"/>
+						// <Root	"Name"="cmd.exe"	"Running": false	"PID""6812"	"ExitCode""0"	"UpTime"="7751"/>
+						// Interested of the latter two only
+
+						Match match = Regex.Match(result.Response, @".*Running\W+(?<IsRunning>true|false).*PID\W+(?<Pid>\d+)(.*ExitCode\W+(?<ExitCode>-?\d+))?.*", RegexOptions.IgnoreCase);
+						if(!match.Success)
+							return;
+
+						bool isRunning = bool.Parse(match.Groups["IsRunning"].Value);
+
+						if(isRunning)
+						{
+							// Monitor a running process
+							int nPid = int.Parse(match.Groups["Pid"].Value);
+							processRoot = Process.GetProcessById(nPid);
+							// Migth sink its Exited event (when we got Tasks here e.g.), but for now it's simpler to reuse the same polling timer
+						}
+						else
+						{
+							// Means done running the payload process in ConEmu, all done
+							if(match.Groups["ExitCode"].Success)
+								_nPayloadExitCode = int.Parse(match.Groups["ExitCode"].Value);
+							_isPayloadExited = true;
+							PayloadExited?.Invoke(this, new ProcessExitedEventArgs(_nPayloadExitCode));
+						}
 					}
 					catch
 					{
 						// Don't want to break the whole process, and got no exception reporter here => skip nonfatal errors, assume it's a temporary problem, ask next time
 					}
-					/*
-					// Waiting for now process yet, ask the console
-					if(DateTime.UtcNow - timeLastAskedForRootPid > TimeSpan.FromSeconds(1)) // Only if not pending a fresh question
-					{
-						timeLastAskedForRootPid = DateTime.UtcNow;
-						BeginGuiMacro("GetInfo").WithParam("ActivePID").Execute(result =>
-						{
-							if(result.ErrorLevel != 0) 
-								return;
-							int nActivePid;
-							if(!int.TryParse(result.Response, out nActivePid))
-								return; // Not an int, that's not expected if errorlevel is 0
-							if(nActivePid == 0)
-							{
-								// Means no process is running in ConEmu, all done
-								_isPayloadExited = true;
-								PayloadExited?.Invoke(this, EventArgs.Empty);
-							}
-							else
-							{
-								// Got a process, wait for this process now
-								// Migth sink its Exited event (when we got Tasks here e.g.), but for now it's simpler to reuse the same polling timer
-								try
-								{
-									processRoot = Process.GetProcessById(nActivePid);
-								}
-								catch(Exception)
-								{
-									// Might be various access problems, or the process might have exited in between our getting its PID and attaching
-								}
-							}
-						});
-					}*/
 				}
 			};
 		}
