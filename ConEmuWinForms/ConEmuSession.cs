@@ -59,10 +59,6 @@ namespace ConEmu.WinForms
 			_dispatcher = new WindowsFormsSynchronizationContext();
 			_dirLocalTempRoot = new DirectoryInfo(Path.Combine(Path.Combine(Path.GetTempPath(), "ConEmu"), $"{DateTime.UtcNow.ToString("s").Replace(':', '-')}.{Process.GetCurrentProcess().Id:X8}.{unchecked((uint)RuntimeHelpers.GetHashCode(this)):X8}")); // Prefixed with date-sortable; then PID; then sync table id of this object
 
-			// Multicast events for parts of functionality to wire up
-			EventHandler evtPolling = null;
-			EventHandler evtCleanupOnExit = null;
-
 			// Events wiring: make sure sinks pre-installed with start-info also get notified
 			if(startinfo.PayloadExitedEventSink != null)
 				PayloadExited += startinfo.PayloadExitedEventSink;
@@ -78,14 +74,14 @@ namespace ConEmu.WinForms
 
 				// Do the pumping periodically (TODO: take this to async?.. but would like to keep the final evt on the home thread, unless we go to tasks)
 				// TODO: if ConEmu writes to a pipe, we might be getting events when more data comes to the pipe rather than poll it by timer
-				evtPolling += delegate { _ansilog.PumpStream(); };
+				_evtPolling += delegate { _ansilog.PumpStream(); };
 
 				// Final
-				evtCleanupOnExit += delegate { _ansilog.Dispose(); };
+				_evtCleanupOnExit += delegate { _ansilog.Dispose(); };
 			}
 
 			// Cmdline
-			CommandLineBuilder cmdl = Init_MakeConEmuCommandLine(startinfo, hostcontext, _ansilog);
+			CommandLineBuilder cmdl = Init_MakeConEmuCommandLine(startinfo, hostcontext, _ansilog, _dirLocalTempRoot);
 
 			// Start ConEmu
 			try
@@ -103,7 +99,7 @@ namespace ConEmu.WinForms
 					_dispatcher.Post(o => // Ensure STA
 					{
 #pragma warning disable once AccessToModifiedClosure
-						evtCleanupOnExit?.Invoke(this, EventArgs.Empty);
+						_evtCleanupOnExit?.Invoke(this, EventArgs.Empty);
 
 						// If we haven't separately caught an exit of the payload process
 						if(!_isPayloadExited)
@@ -137,10 +133,10 @@ namespace ConEmu.WinForms
 
 			// GuiMacro executor & cleanup
 			_guiMacroExecutor = new GuiMacroExecutor(startinfo.ConEmuConsoleServerExecutablePath);
-			evtCleanupOnExit += delegate { ((IDisposable)_guiMacroExecutor).Dispose(); };
+			_evtCleanupOnExit += delegate { ((IDisposable)_guiMacroExecutor).Dispose(); };
 
 			// Monitor payload process
-			Init_PayloadProcessMonitoring(ref evtPolling, ref evtCleanupOnExit);
+			Init_PayloadProcessMonitoring();
 
 			///////////////////////////////
 			// Set up the polling event
@@ -148,17 +144,17 @@ namespace ConEmu.WinForms
 			var timer = new Timer() {Interval = (int)TimeSpan.FromSeconds(.1).TotalMilliseconds, Enabled = true};
 			timer.Tick += delegate
 			{
-				evtPolling?.Invoke(this, EventArgs.Empty);
+				_evtPolling?.Invoke(this, EventArgs.Empty);
 				if(_process.HasExited)
 				{
-					evtPolling = null; // Timer might fire a few more fake events on disposal
+					_evtPolling = null; // Timer might fire a few more fake events on disposal
 					timer.Dispose();
 				}
 			};
-			evtCleanupOnExit += delegate { timer.Dispose(); };
+			_evtCleanupOnExit += delegate { timer.Dispose(); };
 
 			// Schedule cleanup of temp files
-			evtCleanupOnExit += delegate
+			_evtCleanupOnExit += delegate
 			{
 				try
 				{
@@ -175,13 +171,13 @@ namespace ConEmu.WinForms
 		/// <summary>
 		/// Watches for the status of the payload process to fetch its exitcode when done and notify user of that.
 		/// </summary>
-		private void Init_PayloadProcessMonitoring(ref EventHandler evtPolling, ref EventHandler evtCleanupOnExit)
+		private void Init_PayloadProcessMonitoring()
 		{
 			var xmlDoc = new XmlDocument();
 
 			// Detect when payload process exits
 			Process processRoot = null; // After we know the root payload process PID, we'd wait for it to exit
-			evtCleanupOnExit += delegate
+			_evtCleanupOnExit += delegate
 			{
 				if(processRoot != null)
 				{
@@ -189,7 +185,7 @@ namespace ConEmu.WinForms
 					processRoot = null;
 				}
 			};
-			evtPolling += delegate
+			_evtPolling += delegate
 			{
 				if(_isPayloadExited)
 					return;
@@ -273,7 +269,7 @@ namespace ConEmu.WinForms
 		}
 
 		[NotNull]
-		private CommandLineBuilder Init_MakeConEmuCommandLine([NotNull] ConEmuStartInfo startinfo, [NotNull] HostContext hostcontext, [CanBeNull] AnsiLog ansilog)
+		private static CommandLineBuilder Init_MakeConEmuCommandLine([NotNull] ConEmuStartInfo startinfo, [NotNull] HostContext hostcontext, [CanBeNull] AnsiLog ansilog, [NotNull] DirectoryInfo dirLocalTempRoot)
 		{
 			if(startinfo == null)
 				throw new ArgumentNullException(nameof(startinfo));
@@ -292,7 +288,7 @@ namespace ConEmu.WinForms
 			// Basic settings, like fonts and hidden tab bar
 			// Plus some of the properties on this class
 			cmdl.AppendSwitch("-LoadCfgFile");
-			cmdl.AppendFileNameIfNotNull(Init_MakeConEmuCommandLine_EmitConfigFile(_dirLocalTempRoot, startinfo, hostcontext));
+			cmdl.AppendFileNameIfNotNull(Init_MakeConEmuCommandLine_EmitConfigFile(dirLocalTempRoot, startinfo, hostcontext));
 
 			if(!string.IsNullOrEmpty(startinfo.StartupDirectory))
 			{
@@ -306,6 +302,8 @@ namespace ConEmu.WinForms
 				cmdl.AppendSwitch("-AnsiLog");
 				cmdl.AppendFileNameIfNotNull(ansilog.Directory.FullName);
 			}
+			if(dirLocalTempRoot == null)
+				throw new ArgumentNullException(nameof(dirLocalTempRoot));
 
 			// This one MUST be the last switch
 			cmdl.AppendSwitch("-cmd");
@@ -333,6 +331,49 @@ namespace ConEmu.WinForms
 			cmdl.AppendSwitch(startinfo.ConsoleCommandLine);
 
 			return cmdl;
+		}
+
+		private static string Init_MakeConEmuCommandLine_EmitConfigFile([NotNull] DirectoryInfo dirForConfigFile, [NotNull] ConEmuStartInfo startinfo, [NotNull] HostContext hostcontext)
+		{
+			if(dirForConfigFile == null)
+				throw new ArgumentNullException(nameof(dirForConfigFile));
+			if(startinfo == null)
+				throw new ArgumentNullException(nameof(startinfo));
+			if(hostcontext == null)
+				throw new ArgumentNullException(nameof(hostcontext));
+			// Load default template
+			var xmldoc = new XmlDocument();
+			xmldoc.Load(new MemoryStream(Resources.ConEmuSettingsTemplate));
+			XmlNode xmlSettings = xmldoc.SelectSingleNode("/key[@name='Software']/key[@name='ConEmu']/key[@name='.Vanilla']");
+			if(xmlSettings == null)
+				throw new InvalidOperationException("Unexpected mismatch in XML resource structure.");
+
+			// Apply settings from properties
+			{
+				var xmlElem = ((XmlElement)(xmlSettings.SelectSingleNode("value[@name='StatusBar.Show']") ?? xmlSettings.AppendChild(xmldoc.CreateElement("value"))));
+				xmlElem.SetAttribute("type", "hex");
+				xmlElem.SetAttribute("data", (hostcontext.IsStatusbarVisibleInitial ? 1 : 0).ToString());
+			}
+
+			// Environment variables
+			if(startinfo.EnumEnv().Any())
+			{
+				var xmlElem = ((XmlElement)(xmlSettings.SelectSingleNode("value[@name='EnvironmentSet']") ?? xmlSettings.AppendChild(xmldoc.CreateElement("value"))));
+				xmlElem.SetAttribute("type", "multi");
+				foreach(string key in startinfo.EnumEnv())
+				{
+					XmlElement xmlLine;
+					xmlElem.AppendChild(xmlLine = xmldoc.CreateElement("line"));
+					xmlLine.SetAttribute("data", $"set {key}={startinfo.GetEnv(key)}");
+				}
+			}
+
+			// Write out to temp location
+			dirForConfigFile.Create();
+			string sConfigFile = Path.Combine(dirForConfigFile.FullName, "Config.Xml");
+			xmldoc.Save(sConfigFile);
+
+			return sConfigFile;
 		}
 
 		/// <summary>
@@ -431,6 +472,16 @@ namespace ConEmu.WinForms
 		private readonly AnsiLog _ansilog;
 
 		/// <summary>
+		/// Fires periodically while we're alive, allows to wire individual features.
+		/// </summary>
+		private EventHandler _evtPolling;
+
+		/// <summary>
+		/// Fires when we're done with, allows to wire individual features.
+		/// </summary>
+		private EventHandler _evtCleanupOnExit;
+
+		/// <summary>
 		/// Kills the whole console emulator process if it is running. This also terminates the console emulator window.	// TODO: kill payload process only when we know its pid
 		/// </summary>
 		public void KillConsoleEmulator()
@@ -474,49 +525,6 @@ namespace ConEmu.WinForms
 		///     <para>For short-lived processes, this event might fire before you sink it. To get notified reliably, use <see cref="ConEmuStartInfo.ConsoleEmulatorExitedEventSink" />.</para>
 		/// </summary>
 		public event EventHandler ConsoleEmulatorExited;
-
-		private static string Init_MakeConEmuCommandLine_EmitConfigFile([NotNull] DirectoryInfo dirForConfigFile, [NotNull] ConEmuStartInfo startinfo, [NotNull] HostContext hostcontext)
-		{
-			if(dirForConfigFile == null)
-				throw new ArgumentNullException(nameof(dirForConfigFile));
-			if(startinfo == null)
-				throw new ArgumentNullException(nameof(startinfo));
-			if(hostcontext == null)
-				throw new ArgumentNullException(nameof(hostcontext));
-			// Load default template
-			var xmldoc = new XmlDocument();
-			xmldoc.Load(new MemoryStream(Resources.ConEmuSettingsTemplate));
-			XmlNode xmlSettings = xmldoc.SelectSingleNode("/key[@name='Software']/key[@name='ConEmu']/key[@name='.Vanilla']");
-			if(xmlSettings == null)
-				throw new InvalidOperationException("Unexpected mismatch in XML resource structure.");
-
-			// Apply settings from properties
-			{
-				var xmlElem = ((XmlElement)(xmlSettings.SelectSingleNode("value[@name='StatusBar.Show']") ?? xmlSettings.AppendChild(xmldoc.CreateElement("value"))));
-				xmlElem.SetAttribute("type", "hex");
-				xmlElem.SetAttribute("data", (hostcontext.IsStatusbarVisibleInitial ? 1 : 0).ToString());
-			}
-
-			// Environment variables
-			if(startinfo.EnumEnv().Any())
-			{
-				var xmlElem = ((XmlElement)(xmlSettings.SelectSingleNode("value[@name='EnvironmentSet']") ?? xmlSettings.AppendChild(xmldoc.CreateElement("value"))));
-				xmlElem.SetAttribute("type", "multi");
-				foreach(string key in startinfo.EnumEnv())
-				{
-					XmlElement xmlLine;
-					xmlElem.AppendChild(xmlLine = xmldoc.CreateElement("line"));
-					xmlLine.SetAttribute("data", $"set {key}={startinfo.GetEnv(key)}");
-				}
-			}
-
-			// Write out to temp location
-			dirForConfigFile.Create();
-			string sConfigFile = Path.Combine(dirForConfigFile.FullName, "Config.Xml");
-			xmldoc.Save(sConfigFile);
-
-			return sConfigFile;
-		}
 
 		/// <summary>
 		///     <para>Fires when the payload command exits within the terminal. If not <see cref="WhenPayloadProcessExits.CloseTerminal" />, the terminal stays, otherwise it closes also.</para>
