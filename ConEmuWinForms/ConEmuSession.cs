@@ -173,60 +173,9 @@ namespace ConEmu.WinForms
 			};
 			evtCleanupOnExit += delegate { timer.Dispose(); };
 
-			// Attach input file
+			// Attach reading ANSI log and firing events
 			if(dirAnsiLog != null)
-			{
-				// NOTE: can't run GUI macro immediately
-				//				BeginGuiMacro("GetInfo").WithParam("AnsiLog").Execute(result => MessageBox.Show(result.Response));
-
-				// A function which processes the part of the stream which gets available (or does the rest of it at the end)
-				// TODO: try managing memory traffic
-				FileInfo fiLog = null;
-				FileStream fstream = null;
-				Action FPumpStream = () =>
-				{
-					if(fiLog == null)
-						fiLog = dirAnsiLog.GetFiles("ConEmu*.log").FirstOrDefault();
-					if((fstream == null) && (fiLog != null))
-						fstream = fiLog.Open(FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-
-					if(fstream != null)
-					{
-						long length = fstream.Length;
-						if(fstream.Position < length)
-						{
-							var buffer = new byte[length - fstream.Position]; // TODO: buffer pooling
-							int nRead = fstream.Read(buffer, 0, buffer.Length);
-							if(nRead > 0)
-							{
-								// Buffer exactly for data
-								AnsiStreamChunkEventArgs args;
-								if(nRead < buffer.Length)
-								{
-									var subbuffer = new byte[nRead];
-									Buffer.BlockCopy(buffer, 0, subbuffer, 0, nRead);
-									args = new AnsiStreamChunkEventArgs(subbuffer);
-								}
-								else
-									args = new AnsiStreamChunkEventArgs(buffer);
-
-								// Fire
-								_ansiStreamChunkReceived?.Invoke(this, args);
-							}
-						}
-					}
-				};
-
-				// Do the pumping periodically (TODO: take this to async?.. but would like to keep the final evt on the home thread, unless we go to tasks)
-				evtPolling += delegate { FPumpStream(); };
-				evtCleanupOnExit += delegate
-				{
-					// Must pump out the rest of the stream
-					FPumpStream();
-					// Close the file if open
-					fstream?.Dispose(); // Don't NULL it because this way it would throw in case we accidentally call Pump once more
-				};
-			}
+				AttachAnsiLog(dirAnsiLog, ref evtPolling, ref evtCleanupOnExit);
 
 			evtCleanupOnExit += delegate
 			{
@@ -294,6 +243,84 @@ namespace ConEmu.WinForms
 						});
 					}
 				}
+			};
+		}
+
+		private void AttachAnsiLog([NotNull] DirectoryInfo dirAnsiLog, [NotNull] ref EventHandler evtPolling, [NotNull] ref EventHandler evtCleanupOnExit)
+		{
+			if(dirAnsiLog == null)
+				throw new ArgumentNullException(nameof(dirAnsiLog));
+			if(evtPolling == null)
+				throw new ArgumentNullException(nameof(evtPolling));
+			if(evtCleanupOnExit == null)
+				throw new ArgumentNullException(nameof(evtCleanupOnExit));
+
+			// NOTE: it's theoretically possible to get ANSI log file path with “BeginGuiMacro("GetInfo").WithParam("AnsiLog")”
+			// However, this does not provide reliable means for reading the full ANSI output for short-lived processes, we might be too late to ask it for its path
+			// So we specify a new empty folder for the log and expect the single log file to appear in that folder; we'll catch that just as good even after the process exits
+
+			// A function which processes the part of the stream which gets available (or does the rest of it at the end)
+			// TODO: try managing memory traffic
+			FileStream fstream = null;
+			bool isClosed = false;
+			Action FPumpStream = () =>
+			{
+				if(isClosed)
+					return;
+
+				// Try acquiring the stream if not yet
+				if(fstream == null)
+				{
+					foreach(FileInfo fiLog in dirAnsiLog.GetFiles("ConEmu*.log"))
+					{
+						fstream = fiLog.Open(FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+						break;
+					}
+				}
+
+				// No ANSI stream file (yet?)
+				if(fstream == null)
+					return;
+
+				// Read the available chunk
+				long length = fstream.Length; // Take the length and keep it for the rest of the iteration, might change right as we're reading
+				if(fstream.Position >= length)
+					return; // Nothing new
+				var buffer = new byte[length - fstream.Position]; // TODO: buffer pooling to save mem traffic
+				int nRead = fstream.Read(buffer, 0, buffer.Length);
+				if(nRead <= 0)
+					return; // Hmm should have succeeded, but anyway
+
+				// Make a smaller buffer if we got less data (unlikely)
+				AnsiStreamChunkEventArgs args;
+				if(nRead < buffer.Length)
+				{
+					var subbuffer = new byte[nRead];
+					Buffer.BlockCopy(buffer, 0, subbuffer, 0, nRead);
+					args = new AnsiStreamChunkEventArgs(subbuffer);
+				}
+				else
+					args = new AnsiStreamChunkEventArgs(buffer);
+
+				// Fire
+				_ansiStreamChunkReceived?.Invoke(this, args);
+			};
+
+			// Do the pumping periodically (TODO: take this to async?.. but would like to keep the final evt on the home thread, unless we go to tasks)
+			// TODO: if ConEmu writes to a pipe, we might be getting events when more data comes to the pipe rather than poll it by timer
+			evtPolling += delegate { FPumpStream(); };
+
+			// Final
+			evtCleanupOnExit += delegate
+			{
+				// Must pump out the rest of the stream
+				FPumpStream();
+
+				isClosed = true; // AFTER the final pumpout
+
+				// Close the file if open
+				fstream?.Dispose();
+				fstream = null;
 			};
 		}
 
