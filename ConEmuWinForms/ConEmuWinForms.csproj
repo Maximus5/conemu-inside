@@ -44,6 +44,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Annotations\Annotations.cs" />
+    <Compile Include="AnsiLog.cs" />
     <Compile Include="AnsiStreamChunkEventArgs.cs" />
     <Compile Include="ConEmuConstants.cs" />
     <Compile Include="ConEmuControl.cs">

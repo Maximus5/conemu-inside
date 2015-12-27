@@ -22,8 +22,6 @@ namespace ConEmu.WinForms
 	{
 		static readonly bool IsExecutingGuiMacrosInProcess = !true;
 
-		EventHandler<AnsiStreamChunkEventArgs> _ansiStreamChunkReceived;
-
 		[NotNull]
 		private readonly DirectoryInfo _dirLocalTempRoot;
 
@@ -61,28 +59,33 @@ namespace ConEmu.WinForms
 			_dispatcher = new WindowsFormsSynchronizationContext();
 			_dirLocalTempRoot = new DirectoryInfo(Path.Combine(Path.Combine(Path.GetTempPath(), "ConEmu"), $"{DateTime.UtcNow.ToString("s").Replace(':', '-')}.{Process.GetCurrentProcess().Id:X8}.{unchecked((uint)RuntimeHelpers.GetHashCode(this)):X8}")); // Prefixed with date-sortable; then PID; then sync table id of this object
 
+			// Multicast events for parts of functionality to wire up
+			EventHandler evtPolling = null;
+			EventHandler evtCleanupOnExit = null;
+
 			// Events wiring: make sure sinks pre-installed with start-info also get notified
-			if(startinfo.AnsiStreamChunkReceivedEventSink != null)
-				_ansiStreamChunkReceived += startinfo.AnsiStreamChunkReceivedEventSink;
 			if(startinfo.PayloadExitedEventSink != null)
 				PayloadExited += startinfo.PayloadExitedEventSink;
 			if(startinfo.ConsoleEmulatorExitedEventSink != null)
 				ConsoleEmulatorExited += startinfo.ConsoleEmulatorExitedEventSink;
 
 			// Should feed ANSI log?
-			DirectoryInfo dirAnsiLog = null; // The flag which activates all ansi-stream-related features 
 			if(startinfo.IsReadingAnsiStream)
 			{
-				dirAnsiLog = _dirLocalTempRoot;
-				dirAnsiLog.Create();
+				_ansilog = new AnsiLog(_dirLocalTempRoot);
+				if(startinfo.AnsiStreamChunkReceivedEventSink != null)
+					_ansilog.AnsiStreamChunkReceived += startinfo.AnsiStreamChunkReceivedEventSink;
+
+				// Do the pumping periodically (TODO: take this to async?.. but would like to keep the final evt on the home thread, unless we go to tasks)
+				// TODO: if ConEmu writes to a pipe, we might be getting events when more data comes to the pipe rather than poll it by timer
+				evtPolling += delegate { _ansilog.PumpStream(); };
+
+				// Final
+				evtCleanupOnExit += delegate { _ansilog.Dispose(); };
 			}
 
 			// Cmdline
-			CommandLineBuilder cmdl = Init_MakeConEmuCommandLine(startinfo, hostcontext, dirAnsiLog);
-
-			// Multicast events for parts of functionality to wire up
-			EventHandler evtPolling = null;
-			EventHandler evtCleanupOnExit = null;
+			CommandLineBuilder cmdl = Init_MakeConEmuCommandLine(startinfo, hostcontext, _ansilog);
 
 			// Start ConEmu
 			try
@@ -110,6 +113,8 @@ namespace ConEmu.WinForms
 							// We haven't caught the exit of the payload process, so we haven't gotten a message with its errorlevel as well. Assume ConEmu propagates its exit code, as there ain't other way for getting it now
 							// TODO: check that this assumption holds
 							_nPayloadExitCode = _process.ExitCode;
+
+							_ansilog?.Dispose(); // Just to make sure it's been pumped out (should have been by evtCleanupOnExit)
 							PayloadExited?.Invoke(this, new ProcessExitedEventArgs(_nPayloadExitCode));
 						}
 
@@ -127,7 +132,7 @@ namespace ConEmu.WinForms
 				throw new InvalidOperationException("Could not run the console emulator. " + ex.Message + $" ({ex.NativeErrorCode:X8})" + Environment.NewLine + Environment.NewLine + "Command:" + Environment.NewLine + startinfo.ConEmuExecutablePath + Environment.NewLine + Environment.NewLine + "Arguments:" + Environment.NewLine + cmdl, ex);
 			}
 
-			// All evt* multicast events are condidered clean up to this point, so if the process fails to start, no polling/cleanup will be fired yet (and user gets notified via an exception)
+			// All evt* multicast events are condidered noncritical up to this point, so if the process fails to start, no polling/cleanup will be fired yet (and user gets notified via an exception)
 			// From this point on, we MUST guarantee reliable firing of events
 
 			// GuiMacro executor & cleanup
@@ -136,10 +141,6 @@ namespace ConEmu.WinForms
 
 			// Monitor payload process
 			Init_PayloadProcessMonitoring(ref evtPolling, ref evtCleanupOnExit);
-
-			// Attach reading ANSI log and firing events
-			if(dirAnsiLog != null)
-				Init_AttachAnsiLog(dirAnsiLog, ref evtPolling, ref evtCleanupOnExit);
 
 			///////////////////////////////
 			// Set up the polling event
@@ -248,12 +249,18 @@ namespace ConEmu.WinForms
 							processRoot = Process.GetProcessById(nPid);
 							// Migth sink its Exited event (when we got Tasks here e.g.), but for now it's simpler to reuse the same polling timer
 						}
-						else
+						else // Means done running the payload process in ConEmu, all done
 						{
-							// Means done running the payload process in ConEmu, all done
+							// Make sure the whole ANSI log contents is pumped out before we notify user
+							// Dispose call pumps all out and makes sure we never ever fire anything on it after we notify user of PayloadExited; multiple calls to Dispose are OK
+							_ansilog?.Dispose();
+
+							// Fetch exit code
 							if(match.Groups["ExitCode"].Success)
 								_nPayloadExitCode = int.Parse(match.Groups["ExitCode"].Value);
 							_isPayloadExited = true;
+
+							// Notify user
 							PayloadExited?.Invoke(this, new ProcessExitedEventArgs(_nPayloadExitCode));
 						}
 					}
@@ -265,8 +272,14 @@ namespace ConEmu.WinForms
 			};
 		}
 
-		private CommandLineBuilder Init_MakeConEmuCommandLine(ConEmuStartInfo startinfo, HostContext hostcontext, DirectoryInfo dirAnsiLog)
+		[NotNull]
+		private CommandLineBuilder Init_MakeConEmuCommandLine([NotNull] ConEmuStartInfo startinfo, [NotNull] HostContext hostcontext, [CanBeNull] AnsiLog ansilog)
 		{
+			if(startinfo == null)
+				throw new ArgumentNullException(nameof(startinfo));
+			if(hostcontext == null)
+				throw new ArgumentNullException(nameof(hostcontext));
+
 			var cmdl = new CommandLineBuilder();
 
 			// This sets up hosting of ConEmu in our control
@@ -288,10 +301,10 @@ namespace ConEmu.WinForms
 			}
 
 			// ANSI Log file
-			if(dirAnsiLog != null)
+			if(ansilog != null)
 			{
 				cmdl.AppendSwitch("-AnsiLog");
-				cmdl.AppendFileNameIfNotNull(dirAnsiLog.FullName);
+				cmdl.AppendFileNameIfNotNull(ansilog.Directory.FullName);
 			}
 
 			// This one MUST be the last switch
@@ -320,84 +333,6 @@ namespace ConEmu.WinForms
 			cmdl.AppendSwitch(startinfo.ConsoleCommandLine);
 
 			return cmdl;
-		}
-
-		private void Init_AttachAnsiLog([NotNull] DirectoryInfo dirAnsiLog, [NotNull] ref EventHandler evtPolling, [NotNull] ref EventHandler evtCleanupOnExit)
-		{
-			if(dirAnsiLog == null)
-				throw new ArgumentNullException(nameof(dirAnsiLog));
-			if(evtPolling == null)
-				throw new ArgumentNullException(nameof(evtPolling));
-			if(evtCleanupOnExit == null)
-				throw new ArgumentNullException(nameof(evtCleanupOnExit));
-
-			// NOTE: it's theoretically possible to get ANSI log file path with “BeginGuiMacro("GetInfo").WithParam("AnsiLog")”
-			// However, this does not provide reliable means for reading the full ANSI output for short-lived processes, we might be too late to ask it for its path
-			// So we specify a new empty folder for the log and expect the single log file to appear in that folder; we'll catch that just as good even after the process exits
-
-			// A function which processes the part of the stream which gets available (or does the rest of it at the end)
-			// TODO: try managing memory traffic
-			FileStream fstream = null;
-			bool isClosed = false;
-			Action FPumpStream = () =>
-			{
-				if(isClosed)
-					return;
-
-				// Try acquiring the stream if not yet
-				if(fstream == null)
-				{
-					foreach(FileInfo fiLog in dirAnsiLog.GetFiles("ConEmu*.log"))
-					{
-						fstream = fiLog.Open(FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-						break;
-					}
-				}
-
-				// No ANSI stream file (yet?)
-				if(fstream == null)
-					return;
-
-				// Read the available chunk
-				long length = fstream.Length; // Take the length and keep it for the rest of the iteration, might change right as we're reading
-				if(fstream.Position >= length)
-					return; // Nothing new
-				var buffer = new byte[length - fstream.Position]; // TODO: buffer pooling to save mem traffic
-				int nRead = fstream.Read(buffer, 0, buffer.Length);
-				if(nRead <= 0)
-					return; // Hmm should have succeeded, but anyway
-
-				// Make a smaller buffer if we got less data (unlikely)
-				AnsiStreamChunkEventArgs args;
-				if(nRead < buffer.Length)
-				{
-					var subbuffer = new byte[nRead];
-					Buffer.BlockCopy(buffer, 0, subbuffer, 0, nRead);
-					args = new AnsiStreamChunkEventArgs(subbuffer);
-				}
-				else
-					args = new AnsiStreamChunkEventArgs(buffer);
-
-				// Fire
-				_ansiStreamChunkReceived?.Invoke(this, args);
-			};
-
-			// Do the pumping periodically (TODO: take this to async?.. but would like to keep the final evt on the home thread, unless we go to tasks)
-			// TODO: if ConEmu writes to a pipe, we might be getting events when more data comes to the pipe rather than poll it by timer
-			evtPolling += delegate { FPumpStream(); };
-
-			// Final
-			evtCleanupOnExit += delegate
-			{
-				// Must pump out the rest of the stream
-				FPumpStream();
-
-				isClosed = true; // AFTER the final pumpout
-
-				// Close the file if open
-				fstream?.Dispose();
-				fstream = null;
-			};
 		}
 
 		/// <summary>
@@ -490,6 +425,12 @@ namespace ConEmu.WinForms
 		readonly GuiMacroExecutor _guiMacroExecutor;
 
 		/// <summary>
+		/// Non-NULL if we've requested ANSI log from ConEmu and are listening for it.
+		/// </summary>
+		[CanBeNull]
+		private readonly AnsiLog _ansilog;
+
+		/// <summary>
 		/// Kills the whole console emulator process if it is running. This also terminates the console emulator window.	// TODO: kill payload process only when we know its pid
 		/// </summary>
 		public void KillConsoleEmulator()
@@ -509,24 +450,27 @@ namespace ConEmu.WinForms
 		///     <para>Fires when the console process writes into its output or error stream. Gets a chunk of the raw ANSI stream contents.</para>
 		///     <para>For processes which write immediately on startup, this event might fire some chunks before you sink it. To get notified reliably, use <see cref="ConEmuStartInfo.AnsiStreamChunkReceivedEventSink" />.</para>
 		///     <para>To enable sinking this event, you must have <see cref="ConEmuStartInfo.IsReadingAnsiStream" /> set to <c>True</c> before starting the console process.</para>
+		///     <para>If you're reading the ANSI log with <see cref="AnsiStreamChunkReceived" />, it's guaranteed that all the events for the log will be fired before <see cref="PayloadExited" />, and there will be no events afterwards.</para>
 		/// </summary>
 		[SuppressMessage("ReSharper", "DelegateSubtraction")]
 		public event EventHandler<AnsiStreamChunkEventArgs> AnsiStreamChunkReceived
 		{
 			add
 			{
-				if(!_startinfo.IsReadingAnsiStream)
+				if(_ansilog == null)
 					throw new InvalidOperationException("You cannot receive the ANSI stream data because the console process has not been set up to read the ANSI stream before running; set ConEmuStartInfo::IsReadingAnsiStream to True before starting the process.");
-				_ansiStreamChunkReceived += value;
+				_ansilog.AnsiStreamChunkReceived += value;
 			}
 			remove
 			{
-				_ansiStreamChunkReceived -= value;
+				if(_ansilog == null)
+					throw new InvalidOperationException("You cannot receive the ANSI stream data because the console process has not been set up to read the ANSI stream before running; set ConEmuStartInfo::IsReadingAnsiStream to True before starting the process.");
+				_ansilog.AnsiStreamChunkReceived -= value;
 			}
 		}
 
 		/// <summary>
-		///     <para>Fires when the console emulator process exits and stops rendering the terminal view. Note that the root command might have had stopped running long before this moment if <see cref="ConEmuStartInfo.IsKeepingTerminalOnCommandExit" /> prevents terminating the terminal view immediately.</para>
+		///     <para>Fires when the console emulator process exits and stops rendering the terminal view. Note that the root command might have had stopped running long before this moment if not <see cref="WhenPayloadProcessExits.CloseTerminal" /> prevents terminating the terminal view immediately.</para>
 		///     <para>For short-lived processes, this event might fire before you sink it. To get notified reliably, use <see cref="ConEmuStartInfo.ConsoleEmulatorExitedEventSink" />.</para>
 		/// </summary>
 		public event EventHandler ConsoleEmulatorExited;
@@ -577,6 +521,7 @@ namespace ConEmu.WinForms
 		/// <summary>
 		///     <para>Fires when the payload command exits within the terminal. If not <see cref="WhenPayloadProcessExits.CloseTerminal" />, the terminal stays, otherwise it closes also.</para>
 		///     <para>For short-lived processes, this event might fire before you sink it. To get notified reliably, use <see cref="ConEmuStartInfo.PayloadExitedEventSink" />.</para>
+		///     <para>If you're reading the ANSI log with <see cref="AnsiStreamChunkReceived" />, it's guaranteed that all the events for the log will be fired before <see cref="PayloadExited" />, and there will be no events afterwards.</para>
 		/// </summary>
 		public event EventHandler<ProcessExitedEventArgs> PayloadExited;
 
