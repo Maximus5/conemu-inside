@@ -53,7 +53,17 @@ namespace ConEmuInside
 				}
 				if(txtOutput == null)
 					Controls.Add(txtOutput = new TextBox() {Multiline = true, Dock = DockStyle.Right, Width = 200});
-				conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "ping ya.ru", AnsiStreamChunkReceivedEventSink = (sender, args) => txtOutput.Text += args.GetMbcsText(),WhenPayloadProcessExits = WhenPayloadProcessExits.KeepTerminalAndShowMessage, PayloadExitedEventSink = (sender, args) => txtOutput.Text += $"Exited with ERRORLEVEL {args.ExitCode}."});
+				conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "ping ya.ru", AnsiStreamChunkReceivedEventSink = (sender, args) => txtOutput.Text += args.GetMbcsText(), WhenPayloadProcessExits = WhenPayloadProcessExits.KeepTerminalAndShowMessage, PayloadExitedEventSink = (sender, args) => txtOutput.Text += $"Exited with ERRORLEVEL {args.ExitCode}."});
+			};
+
+			stack.Controls.Add(btn = new Button() {Text = "&Choice", AutoSize = true, Dock = DockStyle.Left});
+			btn.Click += delegate
+			{
+				conemu.RunningSession?.KillConsoleEmulator();
+				DialogResult result = MessageBox.Show(this, "Keep terminal when payload exits?", "Choice", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+				if(result == DialogResult.Cancel)
+					return;
+				conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "choice", WhenPayloadProcessExits = result == DialogResult.Yes ? WhenPayloadProcessExits.KeepTerminalAndShowMessage : WhenPayloadProcessExits.CloseTerminal, PayloadExitedEventSink = (sender, args) => MessageBox.Show(this, $"Your choice is {args.ExitCode}.", "Choice", MessageBoxButtons.OK, MessageBoxIcon.Information)});
 			};
 		}
 	}
