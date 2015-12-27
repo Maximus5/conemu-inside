@@ -20,7 +20,7 @@ namespace ConEmuInside
 				conemu.AutoStartInfo.SetEnv("one", "two");
 				conemu.AutoStartInfo.SetEnv("geet", "huub");
 			}
-			conemu.AutoStartInfo = null;
+			//conemu.AutoStartInfo = null;
 			TextBox txt;
 			Controls.Add(txt = new TextBox() {Text = "AnotherFocusableControl", AutoSize = true, Dock = DockStyle.Top});
 
@@ -43,17 +43,17 @@ namespace ConEmuInside
 
 			TextBox txtOutput = null;
 
-			stack.Controls.Add(btn = new Button() {Text = "Whois?", AutoSize = true, Dock = DockStyle.Left});
+			stack.Controls.Add(btn = new Button() {Text = "&Ping", AutoSize = true, Dock = DockStyle.Left});
 			btn.Click += delegate
 			{
 				if(conemu.IsConsoleProcessRunning)
 				{
-					MessageBox.Show(this, "The console is busy right now.", "Whois", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+					MessageBox.Show(this, "The console is busy right now.", "Ping", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 					return;
 				}
 				if(txtOutput == null)
 					Controls.Add(txtOutput = new TextBox() {Multiline = true, Dock = DockStyle.Right, Width = 200});
-				conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "cmd.exe /c whois microsoft.com && ECHO ERRORLEVEL=%ERRORLEVEL%", AnsiStreamChunkReceivedEventSink = (sender, args) => txtOutput.Text += args.GetMbcsText()});
+				conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "ping ya.ru", AnsiStreamChunkReceivedEventSink = (sender, args) => txtOutput.Text += args.GetMbcsText(),WhenPayloadProcessExits = WhenPayloadProcessExits.KeepTerminalAndShowMessage, PayloadExitedEventSink = (sender, args) => txtOutput.Text += $"Exited with ERRORLEVEL {args.ExitCode}."});
 			};
 		}
 	}
