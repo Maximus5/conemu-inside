@@ -95,6 +95,13 @@ namespace ConEmu.WinForms
 			{
 				if(!_isEverRun)
 					throw new InvalidOperationException("The console process has never run in this control.");
+
+				// Special case for just-exited payload: user might get the payload-exited event before us and call this property to get its exit code, while we have not recorded the fresh exit code yet
+				// So call into the current session and fetch the actual value, if available (no need to write to field, will update in our event handler soon)
+				ConEmuSession running = _running;
+				if((running != null) && (running.IsPayloadExited))
+					return running.GetPayloadExitCode();
+
 				return _nLastExitCode;
 			}
 		}
