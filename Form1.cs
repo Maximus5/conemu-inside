@@ -261,16 +261,16 @@ namespace ConEmuInside
                 " -LoadCfgFile \"" + argXmlFile.Text + "\"" +
                 " -Dir \"" + argDirectory.Text + "\"" +
                 (argLog.Checked ? " -Log" : "") +
-                " -cmd " + // This one MUST be the last switch
-                argCmdLine.Text + sRunAs // And the shell command line itself
+                " -detached"
+                //" -cmd " + // This one MUST be the last switch
+                //argCmdLine.Text + sRunAs // And the shell command line itself
                 ;
+
+            promptBox.Text = "Shell(\"new_console\", \"\", \"" + (argCmdLine.Text + sRunAs).Replace("\"", "\\\"") + "\")";
 
             try {
                 // Start ConEmu
                 ConEmu = Process.Start(argConEmuExe.Text, sRunArgs);
-                RefreshControls(true);
-                // Start monitoring
-                timer1.Start();
             } catch (System.ComponentModel.Win32Exception ex) {
                 RefreshControls(false);
                 MessageBox.Show(ex.Message + "\r\n\r\n" +
@@ -278,7 +278,14 @@ namespace ConEmuInside
                     "Arguments:\r\n" + sRunArgs,
                     ex.GetType().FullName + " (" + ex.NativeErrorCode.ToString() + ")",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
             }
+
+            RefreshControls(true);
+            // Start monitoring
+            timer1.Start();
+            // Execute "startup" macro
+            macroBtn_Click(null, null);
         }
 
         private void startArgs_Enter(object sender, EventArgs e)
