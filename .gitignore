@@ -10,3 +10,4 @@ obj
 ConEmu.CommandLine/Tools/ConEmu/*
 *.nupkg
 packages/**
+*.opendb
