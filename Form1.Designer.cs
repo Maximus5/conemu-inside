@@ -55,6 +55,7 @@
             this.timer1 = new System.Windows.Forms.Timer(this.components);
             this.openFileDialog1 = new System.Windows.Forms.OpenFileDialog();
             this.folderBrowserDialog1 = new System.Windows.Forms.FolderBrowserDialog();
+            this.closeBtn = new System.Windows.Forms.Button();
             this.groupBox1.SuspendLayout();
             this.startPanel.SuspendLayout();
             this.groupBox2.SuspendLayout();
@@ -278,6 +279,7 @@
             // 
             this.groupBox2.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
+            this.groupBox2.Controls.Add(this.closeBtn);
             this.groupBox2.Controls.Add(this.macroBtn);
             this.groupBox2.Controls.Add(this.printBtn);
             this.groupBox2.Controls.Add(this.promptBox);
@@ -291,7 +293,7 @@
             // macroBtn
             // 
             this.macroBtn.Anchor = System.Windows.Forms.AnchorStyles.Right;
-            this.macroBtn.Location = new System.Drawing.Point(495, 17);
+            this.macroBtn.Location = new System.Drawing.Point(413, 17);
             this.macroBtn.Name = "macroBtn";
             this.macroBtn.Size = new System.Drawing.Size(75, 23);
             this.macroBtn.TabIndex = 2;
@@ -302,7 +304,7 @@
             // printBtn
             // 
             this.printBtn.Anchor = System.Windows.Forms.AnchorStyles.Right;
-            this.printBtn.Location = new System.Drawing.Point(414, 17);
+            this.printBtn.Location = new System.Drawing.Point(332, 17);
             this.printBtn.Name = "printBtn";
             this.printBtn.Size = new System.Drawing.Size(75, 23);
             this.printBtn.TabIndex = 1;
@@ -315,7 +317,7 @@
             this.promptBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this.promptBox.Location = new System.Drawing.Point(6, 19);
             this.promptBox.Name = "promptBox";
-            this.promptBox.Size = new System.Drawing.Size(402, 20);
+            this.promptBox.Size = new System.Drawing.Size(316, 20);
             this.promptBox.TabIndex = 0;
             this.promptBox.Enter += new System.EventHandler(this.promptBox_Enter);
             this.promptBox.KeyDown += new System.Windows.Forms.KeyEventHandler(this.promptBox_KeyDown);
@@ -335,6 +337,17 @@
             // 
             this.folderBrowserDialog1.Description = "Choose working directory";
             // 
+            // closeBtn
+            // 
+            this.closeBtn.Anchor = System.Windows.Forms.AnchorStyles.Right;
+            this.closeBtn.Location = new System.Drawing.Point(495, 17);
+            this.closeBtn.Name = "closeBtn";
+            this.closeBtn.Size = new System.Drawing.Size(75, 23);
+            this.closeBtn.TabIndex = 3;
+            this.closeBtn.Text = "&Close";
+            this.closeBtn.UseVisualStyleBackColor = true;
+            this.closeBtn.Click += new System.EventHandler(this.closeBtn_Click);
+            // 
             // ChildTerminal
             // 
             this.AcceptButton = this.startBtn;
@@ -343,7 +356,7 @@
             this.ClientSize = new System.Drawing.Size(600, 433);
             this.Controls.Add(this.groupBox2);
             this.Controls.Add(this.groupBox1);
-            this.MinimumSize = new System.Drawing.Size(40, 30);
+            this.MinimumSize = new System.Drawing.Size(40, 39);
             this.Name = "ChildTerminal";
             this.Text = "ConEmu Inside";
             this.Load += new System.EventHandler(this.ChildTerminal_Load);
@@ -384,6 +397,7 @@
         private System.Windows.Forms.TextBox argXmlFile;
         private System.Windows.Forms.CheckBox argLog;
         private System.Windows.Forms.CheckBox argDebug;
+        private System.Windows.Forms.Button closeBtn;
     }
 }
 

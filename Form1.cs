@@ -309,5 +309,10 @@ namespace ConEmuInside
                 }
             }
         }
+
+        private void closeBtn_Click(object sender, EventArgs e)
+        {
+            ExecuteGuiMacro("Close(2,1)");
+        }
     }
 }
