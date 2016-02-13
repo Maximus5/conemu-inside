@@ -31,6 +31,8 @@
             this.components = new System.ComponentModel.Container();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
             this.startPanel = new System.Windows.Forms.Panel();
+            this.argLog = new System.Windows.Forms.CheckBox();
+            this.argDebug = new System.Windows.Forms.CheckBox();
             this.label4 = new System.Windows.Forms.Label();
             this.xmlBtn = new System.Windows.Forms.Button();
             this.argXmlFile = new System.Windows.Forms.TextBox();
@@ -53,8 +55,6 @@
             this.timer1 = new System.Windows.Forms.Timer(this.components);
             this.openFileDialog1 = new System.Windows.Forms.OpenFileDialog();
             this.folderBrowserDialog1 = new System.Windows.Forms.FolderBrowserDialog();
-            this.argDebug = new System.Windows.Forms.CheckBox();
-            this.argLog = new System.Windows.Forms.CheckBox();
             this.groupBox1.SuspendLayout();
             this.startPanel.SuspendLayout();
             this.groupBox2.SuspendLayout();
@@ -100,6 +100,26 @@
             this.startPanel.Size = new System.Drawing.Size(558, 191);
             this.startPanel.TabIndex = 0;
             this.startPanel.Text = "Start parameters";
+            // 
+            // argLog
+            // 
+            this.argLog.AutoSize = true;
+            this.argLog.Location = new System.Drawing.Point(383, 128);
+            this.argLog.Name = "argLog";
+            this.argLog.Size = new System.Drawing.Size(108, 17);
+            this.argLog.TabIndex = 16;
+            this.argLog.Text = "ConEmu LogFiles";
+            this.argLog.UseVisualStyleBackColor = true;
+            // 
+            // argDebug
+            // 
+            this.argDebug.AutoSize = true;
+            this.argDebug.Location = new System.Drawing.Point(256, 128);
+            this.argDebug.Name = "argDebug";
+            this.argDebug.Size = new System.Drawing.Size(111, 17);
+            this.argDebug.TabIndex = 15;
+            this.argDebug.Text = "Wait for debugger";
+            this.argDebug.UseVisualStyleBackColor = true;
             // 
             // label4
             // 
@@ -315,26 +335,6 @@
             // 
             this.folderBrowserDialog1.Description = "Choose working directory";
             // 
-            // argDebug
-            // 
-            this.argDebug.AutoSize = true;
-            this.argDebug.Location = new System.Drawing.Point(256, 128);
-            this.argDebug.Name = "argDebug";
-            this.argDebug.Size = new System.Drawing.Size(111, 17);
-            this.argDebug.TabIndex = 15;
-            this.argDebug.Text = "Wait for debugger";
-            this.argDebug.UseVisualStyleBackColor = true;
-            // 
-            // argLog
-            // 
-            this.argLog.AutoSize = true;
-            this.argLog.Location = new System.Drawing.Point(383, 128);
-            this.argLog.Name = "argLog";
-            this.argLog.Size = new System.Drawing.Size(108, 17);
-            this.argLog.TabIndex = 16;
-            this.argLog.Text = "ConEmu LogFiles";
-            this.argLog.UseVisualStyleBackColor = true;
-            // 
             // ChildTerminal
             // 
             this.AcceptButton = this.startBtn;
@@ -343,7 +343,7 @@
             this.ClientSize = new System.Drawing.Size(600, 433);
             this.Controls.Add(this.groupBox2);
             this.Controls.Add(this.groupBox1);
-            this.MinimumSize = new System.Drawing.Size(400, 300);
+            this.MinimumSize = new System.Drawing.Size(40, 30);
             this.Name = "ChildTerminal";
             this.Text = "ConEmu Inside";
             this.Load += new System.EventHandler(this.ChildTerminal_Load);
