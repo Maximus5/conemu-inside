@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace ConEmuInside
 {
@@ -41,12 +42,13 @@ namespace ConEmuInside
         }
 
 
-        public string Execute(string asWhere, string asMacro)
+        protected string Execute(string asWhere, string asMacro)
         {
             if (ConEmuCD == IntPtr.Zero)
             {
                 throw new GuiMacroException("ConEmuCD was not loaded");
             }
+
 
             string cmdLine = " -GuiMacro";
             if (!String.IsNullOrEmpty(asWhere))
@@ -75,6 +77,40 @@ namespace ConEmuInside
             }
 
             return result;
+        }
+
+        public enum GuiMacroResult
+        {
+            gmrOk = 0,
+            gmrPending = 1,
+            gmrDllNotLoaded = 2,
+            gmrException = 3,
+        };
+
+        public delegate void ExecuteResult(GuiMacroResult code, string data);
+
+        public GuiMacroResult Execute(string asWhere, string asMacro, ExecuteResult aCallbackResult)
+        {
+            if (ConEmuCD == IntPtr.Zero)
+                return GuiMacroResult.gmrDllNotLoaded;
+
+            new Thread(() =>
+            {
+                // Don't block application termination
+                Thread.CurrentThread.IsBackground = true;
+                // Start GuiMacro execution
+                try
+                {
+                    string result = Execute(asWhere, asMacro);
+                    aCallbackResult(GuiMacroResult.gmrOk, result);
+                }
+                catch (GuiMacroException e)
+                {
+                    aCallbackResult(GuiMacroResult.gmrException, e.Message);
+                }
+            }).Start();
+
+            return GuiMacroResult.gmrPending;
         }
 
         public GuiMacro(string asLibrary)
