@@ -20,7 +20,7 @@ namespace ConEmu.WinForms
 	/// </summary>
 	public unsafe class ConEmuSession
 	{
-		static readonly bool IsExecutingGuiMacrosInProcess = !true;
+		static readonly bool IsExecutingGuiMacrosInProcess = true;
 
 		[NotNull]
 		private readonly DirectoryInfo _dirLocalTempRoot;
