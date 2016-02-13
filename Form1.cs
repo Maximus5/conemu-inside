@@ -146,13 +146,14 @@ namespace ConEmuInside
                 guiMacro = null;
             }
 
-            string lsResult;
             try
             {
                 if (guiMacro == null)
                     guiMacro = new GuiMacro(ConEmuCD);
-                lsResult = guiMacro.Execute(ConEmu.Id.ToString(), asMacro);
-                Debugger.Log(0, "GuiMacroResult", lsResult+"\n");
+                guiMacro.Execute(ConEmu.Id.ToString(), asMacro,
+                    (GuiMacro.GuiMacroResult code, string data) => {
+                        Debugger.Log(0, "GuiMacroResult", "code=" + code.ToString() + "; data=" + data + "\n");
+                    });
             }
             catch (GuiMacroException e)
             {
