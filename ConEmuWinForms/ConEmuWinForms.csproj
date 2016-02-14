@@ -8,8 +8,8 @@
     <OutputType>Library</OutputType>
     <RootNamespace>ConEmu.WinForms</RootNamespace>
     <AssemblyName>ConEmu.WinForms</AssemblyName>
-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
-    <TargetFrameworkProfile />
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkProfile>Client</TargetFrameworkProfile>
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
   </PropertyGroup>
