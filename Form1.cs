@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
@@ -101,19 +102,41 @@ namespace ConEmuInside
             return "ConEmu.exe";
         }
 
+        private string GetConEmuExe()
+        {
+            bool bExeLoaded = false;
+            string lsConEmuExe = null;
+
+            while (!bExeLoaded && (ConEmu != null) && !ConEmu.HasExited)
+            {
+                try
+                {
+                    lsConEmuExe = ConEmu.Modules[0].FileName;
+                    bExeLoaded = true;
+                }
+                catch (System.ComponentModel.Win32Exception e)
+                {
+                    Thread.Sleep(50);
+                }
+            }
+
+            return lsConEmuExe;
+        }
+
+        // Returns Path to "ConEmuCD[64].dll" (to GuiMacro execution)
         private string GetConEmuCD()
         {
-            // Returns Path to ConEmuC (to GuiMacro execution)
-
-            if ((ConEmu == null) || ConEmu.HasExited)
-                return null;
-            if (ConEmu.Modules.Count == 0)
+            // Query real (full) path of started executable
+            string lsConEmuExe = GetConEmuExe();
+            if (lsConEmuExe == null)
                 return null;
 
-            string lsDll = (IntPtr.Size == 8) ? "ConEmuCD64.dll" : "ConEmuCD.dll";
+            // Determine bitness of **our** process
+                string lsDll = (IntPtr.Size == 8) ? "ConEmuCD64.dll" : "ConEmuCD.dll";
 
+            // Ready to find the library
             String lsExeDir, ConEmuCD;
-            lsExeDir = Path.GetDirectoryName(ConEmu.Modules[0].FileName);
+            lsExeDir = Path.GetDirectoryName(lsConEmuExe);
             ConEmuCD = Path.Combine(lsExeDir, "ConEmu\\" + lsDll);
             if (!File.Exists(ConEmuCD))
             {
