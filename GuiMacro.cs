@@ -14,6 +14,18 @@ namespace ConEmuInside
 
     public class GuiMacro
     {
+        public enum GuiMacroResult
+        {
+            // Succeeded
+            gmrOk = 0,
+            // Reserved for .Net control module
+            gmrPending = 1,
+            gmrDllNotLoaded = 2,
+            gmrException = 3,
+            // Bad PID or ConEmu HWND was specified
+            gmrInvalidInstance = 4,
+        };
+
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern IntPtr LoadLibrary(string libname);
 
@@ -24,11 +36,17 @@ namespace ConEmuInside
         private static extern IntPtr GetProcAddress(IntPtr hModule, string lpProcName);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)]
-        private delegate int CConsoleMain3(int anWorkMode, string asCommandLine);
+        private delegate int FConsoleMain3(int anWorkMode, string asCommandLine);
+
+        public delegate void ExecuteResult(GuiMacroResult code, [MarshalAs(UnmanagedType.LPWStr)]string data);
+
+        [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)]
+        private delegate int FGuiMacro(string asWhere, string asMacro, IntPtr ExecuteResultDelegate);
 
         private string libraryPath;
         private IntPtr ConEmuCD;
-        private CConsoleMain3 ConsoleMain3;
+        private FConsoleMain3 fnConsoleMain3;
+        private FGuiMacro fnGuiMacro;
 
         public string LibraryPath
         {
@@ -39,11 +57,15 @@ namespace ConEmuInside
         }
 
 
-        protected string Execute(string asWhere, string asMacro)
+        protected string ExecuteLegacy(string asWhere, string asMacro)
         {
             if (ConEmuCD == IntPtr.Zero)
             {
                 throw new GuiMacroException("ConEmuCD was not loaded");
+            }
+            if (fnConsoleMain3 == null)
+            {
+                throw new GuiMacroException("ConsoleMain3 function was not found");
             }
 
 
@@ -55,7 +77,9 @@ namespace ConEmuInside
             Environment.SetEnvironmentVariable("ConEmuMacroResult", null);
 
             string result;
-            int iRc = ConsoleMain3.Invoke(3, cmdLine);
+
+            int iRc = fnConsoleMain3.Invoke(3, cmdLine);
+
             switch (iRc)
             {
                 case 200: // CERR_CMDLINEEMPTY
@@ -76,15 +100,42 @@ namespace ConEmuInside
             return result;
         }
 
-        public enum GuiMacroResult
+        protected void ExecuteHelper(string asWhere, string asMacro, ExecuteResult aCallbackResult)
         {
-            gmrOk = 0,
-            gmrPending = 1,
-            gmrDllNotLoaded = 2,
-            gmrException = 3,
-        };
+            if (aCallbackResult == null)
+            {
+                throw new GuiMacroException("aCallbackResult was not specified");
+            }
 
-        public delegate void ExecuteResult(GuiMacroResult code, string data);
+            // New ConEmu builds exports "GuiMacro" function
+            if (fnGuiMacro != null)
+            {
+                IntPtr fnCallback = Marshal.GetFunctionPointerForDelegate(aCallbackResult);
+                if (fnCallback == IntPtr.Zero)
+                {
+                    throw new GuiMacroException("GetFunctionPointerForDelegate failed");
+                }
+
+                int iRc = fnGuiMacro.Invoke(asWhere, asMacro, fnCallback);
+
+                switch (iRc)
+                {
+                    case 0: // This is expected
+                    case 133: // CERR_GUIMACRO_SUCCEEDED: not expected, but...
+                        // OK
+                        break;
+                    case 134: // CERR_GUIMACRO_FAILED
+                        throw new GuiMacroException("GuiMacro execution failed");
+                    default:
+                        throw new GuiMacroException(string.Format("Internal ConEmuCD error: {0}", iRc));
+                }
+            }
+            else
+            {
+                string result = ExecuteLegacy(asWhere, asMacro);
+                aCallbackResult(GuiMacroResult.gmrOk, result);
+            }
+        }
 
         public GuiMacroResult Execute(string asWhere, string asMacro, ExecuteResult aCallbackResult)
         {
@@ -98,8 +149,7 @@ namespace ConEmuInside
                 // Start GuiMacro execution
                 try
                 {
-                    string result = Execute(asWhere, asMacro);
-                    aCallbackResult(GuiMacroResult.gmrOk, result);
+                    ExecuteHelper(asWhere, asMacro, aCallbackResult);
                 }
                 catch (GuiMacroException e)
                 {
@@ -113,6 +163,8 @@ namespace ConEmuInside
         public GuiMacro(string asLibrary)
         {
             ConEmuCD = IntPtr.Zero;
+            fnConsoleMain3 = null;
+            fnGuiMacro = null;
             libraryPath = asLibrary;
             LoadConEmuDll(asLibrary);
         }
@@ -137,15 +189,27 @@ namespace ConEmuInside
             }
 
             // int __stdcall ConsoleMain3(int anWorkMode/*0-Server&ComSpec,1-AltServer,2-Reserved*/, LPCWSTR asCmdLine)
-            const string fnName = "ConsoleMain3";
-            IntPtr exportPtr = GetProcAddress(ConEmuCD, fnName);
-            if (exportPtr == IntPtr.Zero)
+            const string fnNameOld = "ConsoleMain3";
+            IntPtr ptrConsoleMain = GetProcAddress(ConEmuCD, fnNameOld);
+            const string fnNameNew = "GuiMacro";
+            IntPtr ptrGuiMacro = GetProcAddress(ConEmuCD, fnNameNew);
+
+            if ((ptrConsoleMain == IntPtr.Zero) && (ptrGuiMacro == IntPtr.Zero))
             {
                 UnloadConEmuDll();
-                throw new GuiMacroException(string.Format("Function {0} not found in library\n{1}\nUpdate ConEmu modules", fnName, asLibrary));
+                throw new GuiMacroException(string.Format("Function {0} not found in library\n{1}\nUpdate ConEmu modules", fnNameOld, asLibrary));
             }
-            ConsoleMain3 = (CConsoleMain3)Marshal.GetDelegateForFunctionPointer(exportPtr, typeof(CConsoleMain3));
-            // To call: ConsoleMain3.Invoke(0, cmdline);
+
+            if (ptrGuiMacro != IntPtr.Zero)
+            {
+                // To call: ExecGuiMacro.Invoke(asWhere, asCommand, callbackDelegate);
+                fnGuiMacro = (FGuiMacro)Marshal.GetDelegateForFunctionPointer(ptrGuiMacro, typeof(FGuiMacro));
+            }
+            if (ptrConsoleMain != IntPtr.Zero)
+            {
+                // To call: ConsoleMain3.Invoke(0, cmdline);
+                fnConsoleMain3 = (FConsoleMain3)Marshal.GetDelegateForFunctionPointer(ptrConsoleMain, typeof(FConsoleMain3));
+            }
         }
 
         private void UnloadConEmuDll()
