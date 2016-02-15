@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 using JetBrains.Annotations;
@@ -17,14 +18,14 @@ namespace ConEmu.WinForms
 	{
 		private ConEmuStartInfo _autostartinfo = new ConEmuStartInfo(); // Enabled by default, and with all default values
 
-		bool _isEverRun;
+		private bool _isEverRun;
 
 		private bool _isStatusbarVisible = true;
 
 		private int _nLastExitCode;
 
 		[CanBeNull]
-		ConEmuSession _running;
+		private ConEmuSession _running;
 
 		public ConEmuControl()
 		{
@@ -82,7 +83,7 @@ namespace ConEmu.WinForms
 			{
 				_isStatusbarVisible = value;
 				if(_running != null)
-					BeginGuiMacro("Status").WithParam(0).WithParam(value ? 1 : 2).Execute();
+					BeginGuiMacro("Status").WithParam(0).WithParam(value ? 1 : 2).ExecuteAsync();
 			}
 		}
 
@@ -140,10 +141,9 @@ namespace ConEmu.WinForms
 		/// Executes a ConEmu GUI Macro on the active console, see http://conemu.github.io/en/GuiMacro.html .
 		/// </summary>
 		/// <param name="macrotext">The full macro command, see http://conemu.github.io/en/GuiMacro.html .</param>
-		/// <param name="FWhenDone">Optional. Executes on the same thread when the macro is done executing.</param>
-		public void ExecuteGuiMacroText([NotNull] string macrotext, [CanBeNull] Action<GuiMacroResult> FWhenDone = null)
+		public Task<GuiMacroResult> ExecuteGuiMacroTextAsync([NotNull] string macrotext)
 		{
-			GetRunningSession().ExecuteGuiMacroText(macrotext, FWhenDone);
+			return GetRunningSession().ExecuteGuiMacroTextAsync(macrotext);
 		}
 
 		public void PasteText([NotNull] string text)
@@ -153,7 +153,7 @@ namespace ConEmu.WinForms
 			if(text.Length == 0)
 				return;
 
-			BeginGuiMacro("Paste").WithParam(2).WithParam(text).Execute();
+			BeginGuiMacro("Paste").WithParam(2).WithParam(text).ExecuteAsync();
 		}
 
 		/// <summary>

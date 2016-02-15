@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 using ConEmu.WinForms;
@@ -32,10 +33,10 @@ namespace ConEmuInside
 			btn.Click += delegate { conemu.PasteText("whois microsoft.com" + Environment.NewLine); };
 
 			stack.Controls.Add(btn = new Button() {Text = "Query HWND", AutoSize = true, Dock = DockStyle.Left});
-			btn.Click += delegate { conemu.BeginGuiMacro("GetInfo").WithParam("HWND").Execute(result => txt.Text = $"ConEmu HWND: {Regex.Replace(result.Response, "\\s+", " ")}"); };
+			btn.Click += delegate { conemu.BeginGuiMacro("GetInfo").WithParam("HWND").ExecuteAsync().ContinueWith(task => txt.Text = $"ConEmu HWND: {Regex.Replace(task.Result.Response, "\\s+", " ")}", TaskScheduler.FromCurrentSynchronizationContext()); };
 
 			stack.Controls.Add(btn = new Button() {Text = "Query PID", AutoSize = true, Dock = DockStyle.Left});
-			btn.Click += delegate { conemu.BeginGuiMacro("GetInfo").WithParam("PID").Execute(result => txt.Text = $"ConEmu PID: {Regex.Replace(result.Response, "\\s+", " ")}"); };
+			btn.Click += delegate { conemu.BeginGuiMacro("GetInfo").WithParam("PID").ExecuteAsync().ContinueWith(task => txt.Text = $"ConEmu PID: {Regex.Replace(task.Result.Response, "\\s+", " ")}", TaskScheduler.FromCurrentSynchronizationContext()); };
 
 			CheckBox checkStatusBar;
 			stack.Controls.Add(checkStatusBar = new CheckBox() {Text = "StatusBar", Checked = conemu.IsStatusbarVisible});

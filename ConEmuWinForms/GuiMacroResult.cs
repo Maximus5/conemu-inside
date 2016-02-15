@@ -6,9 +6,9 @@
 	public struct GuiMacroResult
 	{
 		/// <summary>
-		/// ERRORLEVEL of the ConEmu Console Extender process.
+		/// Whether macro execution returned success.
 		/// </summary>
-		public int ErrorLevel;
+		public bool IsSuccessful;
 
 		/// <summary>
 		/// String response of the command, “<c>OK</c>” if successful and without output.
@@ -17,7 +17,7 @@
 
 		public override string ToString()
 		{
-			return $"{Response} ({checked((uint)ErrorLevel):X})";
+			return $"{Response} ({(IsSuccessful ? "Succeeded" : "Failed")})";
 		}
 	}
 }

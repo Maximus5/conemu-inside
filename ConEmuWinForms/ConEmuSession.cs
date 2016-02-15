@@ -6,12 +6,16 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml;
 
 using JetBrains.Annotations;
 
 using Microsoft.Build.Utilities;
+
+using Timer = System.Windows.Forms.Timer;
 
 namespace ConEmu.WinForms
 {
@@ -20,7 +24,7 @@ namespace ConEmu.WinForms
 	/// </summary>
 	public unsafe class ConEmuSession
 	{
-		static readonly bool IsExecutingGuiMacrosInProcess = true;
+		private static readonly bool IsExecutingGuiMacrosInProcess = true;
 
 		[NotNull]
 		private readonly DirectoryInfo _dirLocalTempRoot;
@@ -28,7 +32,7 @@ namespace ConEmu.WinForms
 		[NotNull]
 		private readonly WindowsFormsSynchronizationContext _dispatcher;
 
-		bool _isPayloadExited;
+		private bool _isPayloadExited;
 
 		/// <summary>
 		/// The exit code of the payload process, if it has already exited (<see cref="_isPayloadExited" />). Otherwise, undefined behavior.
@@ -210,7 +214,7 @@ namespace ConEmu.WinForms
 						// Get info on the root payload process
 						GuiMacroResult result = BeginGuiMacro("GetInfo").WithParam("Root").ExecuteSync();
 
-						if(result.ErrorLevel != 0) // E.g. ConEmu has not fully started yet, and ConEmuC failed to connect to the instance — would usually return an error on the first call
+						if(!result.IsSuccessful) // E.g. ConEmu has not fully started yet, and ConEmuC failed to connect to the instance — would usually return an error on the first call
 							return;
 						if(string.IsNullOrEmpty(result.Response)) // Might yield an empty string randomly if not ready yet
 							return;
@@ -419,9 +423,7 @@ namespace ConEmu.WinForms
 		/// Executes a ConEmu GUI Macro on the active console, see http://conemu.github.io/en/GuiMacro.html .
 		/// </summary>
 		/// <param name="macrotext">The full macro command, see http://conemu.github.io/en/GuiMacro.html .</param>
-		/// <param name="FWhenDone">Optional. Executes on the same thread when the macro is done executing.</param>
-		/// <param name="isSync">Forces synchronous execution. If <c>False</c>, the operation might be carried out async.</param>
-		public void ExecuteGuiMacroText([NotNull] string macrotext, [CanBeNull] Action<GuiMacroResult> FWhenDone = null, bool isSync = false)
+		public Task<GuiMacroResult> ExecuteGuiMacroTextAsync([NotNull] string macrotext)
 		{
 			if(macrotext == null)
 				throw new ArgumentNullException(nameof(macrotext));
@@ -430,13 +432,7 @@ namespace ConEmu.WinForms
 			if(processConEmu == null)
 				throw new InvalidOperationException("Cannot execute a macro because the console process is not running at the moment.");
 
-			if(IsExecutingGuiMacrosInProcess)
-			{
-				GuiMacroResult result = _guiMacroExecutor.ExecuteInProcess(processConEmu.Id, macrotext);
-				FWhenDone?.Invoke(result);
-			}
-			else
-				_guiMacroExecutor.ExecuteViaExtenderProcess(macrotext, FWhenDone, isSync, processConEmu.Id, _startinfo.ConEmuConsoleExtenderExecutablePath);
+			return IsExecutingGuiMacrosInProcess ? _guiMacroExecutor.ExecuteInProcessAsync(processConEmu.Id, macrotext) : _guiMacroExecutor.ExecuteViaExtenderProcessAsync(macrotext, processConEmu.Id, _startinfo.ConEmuConsoleExtenderExecutablePath);
 		}
 
 		/// <summary>
@@ -448,22 +444,25 @@ namespace ConEmu.WinForms
 			if(macrotext == null)
 				throw new ArgumentNullException(nameof(macrotext));
 
-			Process processConEmu = _process;
-			if(processConEmu == null)
-				throw new InvalidOperationException("Cannot execute a macro because the console process is not running at the moment.");
+			Task<GuiMacroResult> task = ExecuteGuiMacroTextAsync(macrotext);
 
-			if(IsExecutingGuiMacrosInProcess)
-				return _guiMacroExecutor.ExecuteInProcess(processConEmu.Id, macrotext);
+			// No meaningful message pump on an MTA thread by contract, so can just do a blocking wait
+			if(Thread.CurrentThread.GetApartmentState() == ApartmentState.MTA)
+				return task.Result;
 
-			// Get result sync
-			GuiMacroResult? retval = null;
-			_guiMacroExecutor.ExecuteViaExtenderProcess(macrotext, result => retval = result, true, processConEmu.Id, _startinfo.ConEmuConsoleExtenderExecutablePath);
-			if(retval == null)
-				throw new InvalidOperationException("The GuiMacro has failed to execute and provide the result synchronously.");
-			return retval.Value;
+			// On an STA thread we should be pumping
+			bool isThru = false;
+			task.ContinueWith(t => isThru = true);
+
+			while(!isThru)
+			{
+				Application.DoEvents();
+				Thread.Sleep(10);
+			}
+			return task.Result;
 		}
 
-		readonly GuiMacroExecutor _guiMacroExecutor;
+		private readonly GuiMacroExecutor _guiMacroExecutor;
 
 		/// <summary>
 		/// Non-NULL if we've requested ANSI log from ConEmu and are listening for it.

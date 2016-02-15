@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 using JetBrains.Annotations;
 
@@ -35,12 +36,12 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		/// Renders the macro and executes with ConEmu.
+		/// Renders the macro and executes with ConEmu, asynchronously.
 		/// </summary>
-		/// <param name="FWhenDone">Optional. Executes on the same thread when the macro is done executing.</param>
-		public void Execute(Action<GuiMacroResult> FWhenDone = null)
+		[NotNull]
+		public Task<GuiMacroResult> ExecuteAsync()
 		{
-			_owner.ExecuteGuiMacroText(ConEmuLogic.RenderMacroCommand(_sMacroName, _parameters), FWhenDone);
+			return _owner.ExecuteGuiMacroTextAsync(ConEmuLogic.RenderMacroCommand(_sMacroName, _parameters));
 		}
 
 		/// <summary>
