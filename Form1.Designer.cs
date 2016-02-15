@@ -31,6 +31,8 @@
             this.components = new System.ComponentModel.Container();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
             this.startPanel = new System.Windows.Forms.Panel();
+            this.argLog = new System.Windows.Forms.CheckBox();
+            this.argDebug = new System.Windows.Forms.CheckBox();
             this.label4 = new System.Windows.Forms.Label();
             this.xmlBtn = new System.Windows.Forms.Button();
             this.argXmlFile = new System.Windows.Forms.TextBox();
@@ -53,8 +55,7 @@
             this.timer1 = new System.Windows.Forms.Timer(this.components);
             this.openFileDialog1 = new System.Windows.Forms.OpenFileDialog();
             this.folderBrowserDialog1 = new System.Windows.Forms.FolderBrowserDialog();
-            this.argDebug = new System.Windows.Forms.CheckBox();
-            this.argLog = new System.Windows.Forms.CheckBox();
+            this.closeBtn = new System.Windows.Forms.Button();
             this.groupBox1.SuspendLayout();
             this.startPanel.SuspendLayout();
             this.groupBox2.SuspendLayout();
@@ -100,6 +101,26 @@
             this.startPanel.Size = new System.Drawing.Size(558, 191);
             this.startPanel.TabIndex = 0;
             this.startPanel.Text = "Start parameters";
+            // 
+            // argLog
+            // 
+            this.argLog.AutoSize = true;
+            this.argLog.Location = new System.Drawing.Point(383, 128);
+            this.argLog.Name = "argLog";
+            this.argLog.Size = new System.Drawing.Size(108, 17);
+            this.argLog.TabIndex = 16;
+            this.argLog.Text = "ConEmu LogFiles";
+            this.argLog.UseVisualStyleBackColor = true;
+            // 
+            // argDebug
+            // 
+            this.argDebug.AutoSize = true;
+            this.argDebug.Location = new System.Drawing.Point(256, 128);
+            this.argDebug.Name = "argDebug";
+            this.argDebug.Size = new System.Drawing.Size(111, 17);
+            this.argDebug.TabIndex = 15;
+            this.argDebug.Text = "Wait for debugger";
+            this.argDebug.UseVisualStyleBackColor = true;
             // 
             // label4
             // 
@@ -258,6 +279,7 @@
             // 
             this.groupBox2.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
+            this.groupBox2.Controls.Add(this.closeBtn);
             this.groupBox2.Controls.Add(this.macroBtn);
             this.groupBox2.Controls.Add(this.printBtn);
             this.groupBox2.Controls.Add(this.promptBox);
@@ -271,7 +293,7 @@
             // macroBtn
             // 
             this.macroBtn.Anchor = System.Windows.Forms.AnchorStyles.Right;
-            this.macroBtn.Location = new System.Drawing.Point(495, 17);
+            this.macroBtn.Location = new System.Drawing.Point(413, 17);
             this.macroBtn.Name = "macroBtn";
             this.macroBtn.Size = new System.Drawing.Size(75, 23);
             this.macroBtn.TabIndex = 2;
@@ -282,7 +304,7 @@
             // printBtn
             // 
             this.printBtn.Anchor = System.Windows.Forms.AnchorStyles.Right;
-            this.printBtn.Location = new System.Drawing.Point(414, 17);
+            this.printBtn.Location = new System.Drawing.Point(332, 17);
             this.printBtn.Name = "printBtn";
             this.printBtn.Size = new System.Drawing.Size(75, 23);
             this.printBtn.TabIndex = 1;
@@ -295,7 +317,7 @@
             this.promptBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this.promptBox.Location = new System.Drawing.Point(6, 19);
             this.promptBox.Name = "promptBox";
-            this.promptBox.Size = new System.Drawing.Size(402, 20);
+            this.promptBox.Size = new System.Drawing.Size(316, 20);
             this.promptBox.TabIndex = 0;
             this.promptBox.Enter += new System.EventHandler(this.promptBox_Enter);
             this.promptBox.KeyDown += new System.Windows.Forms.KeyEventHandler(this.promptBox_KeyDown);
@@ -315,25 +337,16 @@
             // 
             this.folderBrowserDialog1.Description = "Choose working directory";
             // 
-            // argDebug
+            // closeBtn
             // 
-            this.argDebug.AutoSize = true;
-            this.argDebug.Location = new System.Drawing.Point(256, 128);
-            this.argDebug.Name = "argDebug";
-            this.argDebug.Size = new System.Drawing.Size(111, 17);
-            this.argDebug.TabIndex = 15;
-            this.argDebug.Text = "Wait for debugger";
-            this.argDebug.UseVisualStyleBackColor = true;
-            // 
-            // argLog
-            // 
-            this.argLog.AutoSize = true;
-            this.argLog.Location = new System.Drawing.Point(383, 128);
-            this.argLog.Name = "argLog";
-            this.argLog.Size = new System.Drawing.Size(108, 17);
-            this.argLog.TabIndex = 16;
-            this.argLog.Text = "ConEmu LogFiles";
-            this.argLog.UseVisualStyleBackColor = true;
+            this.closeBtn.Anchor = System.Windows.Forms.AnchorStyles.Right;
+            this.closeBtn.Location = new System.Drawing.Point(495, 17);
+            this.closeBtn.Name = "closeBtn";
+            this.closeBtn.Size = new System.Drawing.Size(75, 23);
+            this.closeBtn.TabIndex = 3;
+            this.closeBtn.Text = "&Close";
+            this.closeBtn.UseVisualStyleBackColor = true;
+            this.closeBtn.Click += new System.EventHandler(this.closeBtn_Click);
             // 
             // ChildTerminal
             // 
@@ -343,7 +356,7 @@
             this.ClientSize = new System.Drawing.Size(600, 433);
             this.Controls.Add(this.groupBox2);
             this.Controls.Add(this.groupBox1);
-            this.MinimumSize = new System.Drawing.Size(400, 300);
+            this.MinimumSize = new System.Drawing.Size(40, 39);
             this.Name = "ChildTerminal";
             this.Text = "ConEmu Inside";
             this.Load += new System.EventHandler(this.ChildTerminal_Load);
@@ -384,6 +397,7 @@
         private System.Windows.Forms.TextBox argXmlFile;
         private System.Windows.Forms.CheckBox argLog;
         private System.Windows.Forms.CheckBox argDebug;
+        private System.Windows.Forms.Button closeBtn;
     }
 }
 
