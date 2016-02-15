@@ -24,6 +24,8 @@ namespace ConEmuInside
             gmrException = 3,
             // Bad PID or ConEmu HWND was specified
             gmrInvalidInstance = 4,
+            // Unknown macro execution error in ConEmu
+            gmrExecError = 5,
         };
 
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
@@ -38,10 +40,10 @@ namespace ConEmuInside
         [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)]
         private delegate int FConsoleMain3(int anWorkMode, string asCommandLine);
 
-        public delegate void ExecuteResult(GuiMacroResult code, [MarshalAs(UnmanagedType.LPWStr)]string data);
+        public delegate void ExecuteResult(GuiMacroResult code, string data);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)]
-        private delegate int FGuiMacro(string asWhere, string asMacro, IntPtr ExecuteResultDelegate);
+        private delegate int FGuiMacro(string asWhere, string asMacro, out IntPtr bstrResult);
 
         private string libraryPath;
         private IntPtr ConEmuCD;
@@ -107,6 +109,9 @@ namespace ConEmuInside
                 throw new GuiMacroException("aCallbackResult was not specified");
             }
 
+            string result;
+            GuiMacroResult code;
+
             // New ConEmu builds exports "GuiMacro" function
             if (fnGuiMacro != null)
             {
@@ -116,25 +121,44 @@ namespace ConEmuInside
                     throw new GuiMacroException("GetFunctionPointerForDelegate failed");
                 }
 
-                int iRc = fnGuiMacro.Invoke(asWhere, asMacro, fnCallback);
+                IntPtr bstrPtr = IntPtr.Zero;
+                int iRc = fnGuiMacro.Invoke(asWhere, asMacro, out bstrPtr);
 
                 switch (iRc)
                 {
-                    case 0: // This is expected
-                    case 133: // CERR_GUIMACRO_SUCCEEDED: not expected, but...
-                        // OK
+                    case 0: // This is not expected for `GuiMacro` exported funciton, but JIC
+                    case 133: // CERR_GUIMACRO_SUCCEEDED: expected
+                        code = GuiMacroResult.gmrOk;
                         break;
                     case 134: // CERR_GUIMACRO_FAILED
-                        throw new GuiMacroException("GuiMacro execution failed");
+                        code = GuiMacroResult.gmrExecError;
+                        break;
                     default:
                         throw new GuiMacroException(string.Format("Internal ConEmuCD error: {0}", iRc));
+                }
+
+                if (bstrPtr == IntPtr.Zero)
+                {
+                	// Not expected, `GuiMacro` must return some BSTR in any case
+                	throw new GuiMacroException("Empty bstrPtr was returned");
+                }
+
+                result = Marshal.PtrToStringBSTR(bstrPtr);
+                Marshal.FreeBSTR(bstrPtr);
+
+                if (result == null)
+                {
+                	// Not expected, `GuiMacro` must return some BSTR in any case
+                	throw new GuiMacroException("Marshal.PtrToStringBSTR failed");
                 }
             }
             else
             {
-                string result = ExecuteLegacy(asWhere, asMacro);
-                aCallbackResult(GuiMacroResult.gmrOk, result);
+                result = ExecuteLegacy(asWhere, asMacro);
+                code = GuiMacroResult.gmrOk;
             }
+
+            aCallbackResult(code, result);
         }
 
         public GuiMacroResult Execute(string asWhere, string asMacro, ExecuteResult aCallbackResult)
