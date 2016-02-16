@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -378,7 +379,11 @@ namespace ConEmu.WinForms
 				// Echo the custom greeting text
 				if(startinfo.GreetingText.Length > 0)
 				{
-					foreach(string line in Regex.Split(startinfo.GreetingText, @"\r\n|\n|\r"))
+					// Echo each line separately
+					List<string> lines = Regex.Split(startinfo.GreetingText, @"\r\n|\n|\r").ToList();
+					if((lines.Any()) && (lines.Last().Length == 0)) // Newline handling, as declared
+						lines.RemoveAt(lines.Count - 1);
+					foreach(string line in lines)
 					{
 						XmlElement xmlLine;
 						xmlElem.AppendChild(xmlLine = xmldoc.CreateElement("line"));

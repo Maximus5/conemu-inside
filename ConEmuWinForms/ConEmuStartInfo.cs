@@ -183,6 +183,7 @@ namespace ConEmu.WinForms
 		/// <summary>
 		///     <para>Gets or sets the custom greeting text which will be echoed into the terminal stdout before the <see cref="ConsoleCommandLine" /> starts executing.</para>
 		///     <para>Note that to echo the <see cref="ConsoleCommandLine" /> itself you can use the more specific <see cref="IsEchoingConsoleCommandLine" /> option (which prints after the custom greeting text).</para>
+		///     <para>Newline handling: a newline is added automatically at the end, if missing; if there's a single newline at the end, it is retained AS IS. If you want an empty line after text, add a double newline.</para>
 		///     <para>The default is an empty string for no custom greeting.</para>
 		///     <para>This property cannot be changed when the process is running.</para>
 		/// </summary>
