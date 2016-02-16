@@ -5,7 +5,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -363,7 +362,7 @@ namespace ConEmu.WinForms
 			}
 
 			// Environment variables
-			if((startinfo.EnumEnv().Any()) || (startinfo.IsEchoingConsoleCommandLine))
+			if((startinfo.EnumEnv().Any()) || (startinfo.IsEchoingConsoleCommandLine) || (startinfo.GreetingText.Length > 0))
 			{
 				string keyname = "EnvironmentSet";
 				var xmlElem = ((XmlElement)(xmlSettings.SelectSingleNode($"value[@name='{keyname}']") ?? xmlSettings.AppendChild(xmldoc.CreateElement("value"))));
@@ -374,6 +373,20 @@ namespace ConEmu.WinForms
 					XmlElement xmlLine;
 					xmlElem.AppendChild(xmlLine = xmldoc.CreateElement("line"));
 					xmlLine.SetAttribute("data", $"set {key}={startinfo.GetEnv(key)}");
+				}
+
+				// Echo the custom greeting text
+				if(startinfo.GreetingText.Length > 0)
+				{
+					foreach(string line in Regex.Split(startinfo.GreetingText, @"\r\n|\n|\r"))
+					{
+						XmlElement xmlLine;
+						xmlElem.AppendChild(xmlLine = xmldoc.CreateElement("line"));
+						var cmdlGreetingLine = new CommandLineBuilder();
+						cmdlGreetingLine.AppendSwitch("echo");
+						cmdlGreetingLine.AppendFileNameIfNotNull(line);
+						xmlLine.SetAttribute("data", cmdlGreetingLine.ToString());
+					}
 				}
 
 				// To echo the cmdline, add an echo command to the env-init session

@@ -54,7 +54,7 @@ namespace ConEmuInside
 				}
 				if(txtOutput == null)
 					Controls.Add(txtOutput = new TextBox() {Multiline = true, Dock = DockStyle.Right, Width = 200});
-				conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "ping ya.ru", IsEchoingConsoleCommandLine = true, AnsiStreamChunkReceivedEventSink = (sender, args) => txtOutput.Text += args.GetMbcsText(), WhenPayloadProcessExits = WhenPayloadProcessExits.KeepTerminalAndShowMessage, PayloadExitedEventSink = (sender, args) => txtOutput.Text += $"Exited with ERRORLEVEL {args.ExitCode}."});
+				conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "ping ya.ru", IsEchoingConsoleCommandLine = true, AnsiStreamChunkReceivedEventSink = (sender, args) => txtOutput.Text += args.GetMbcsText(), WhenPayloadProcessExits = WhenPayloadProcessExits.KeepTerminalAndShowMessage, PayloadExitedEventSink = (sender, args) => txtOutput.Text += $"Exited with ERRORLEVEL {args.ExitCode}.", GreetingText = $"This will showcase getting the command output live in the backend.{Environment.NewLine}As the PING command runs, the textbox would duplicate its stdout in real time.{Environment.NewLine}{Environment.NewLine}"});
 			};
 
 			stack.Controls.Add(btn = new Button() {Text = "&Choice", AutoSize = true, Dock = DockStyle.Left});

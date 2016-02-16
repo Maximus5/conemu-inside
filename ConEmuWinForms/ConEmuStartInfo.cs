@@ -40,6 +40,9 @@ namespace ConEmu.WinForms
 
 		private string _sConsoleCommandLine = ConEmuConstants.DefaultConsoleCommandLine;
 
+		[NotNull]
+		private string _sGreetingText = "";
+
 		private string _sStartupDirectory;
 
 		private WhenPayloadProcessExits _whenPayloadProcessExits = WhenPayloadProcessExits.KeepTerminalAndShowMessage;
@@ -178,7 +181,29 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		///     <para>Gets or sets whether the console command line will be echoed into the terminal stdout before being executed.</para>
+		///     <para>Gets or sets the custom greeting text which will be echoed into the terminal stdout before the <see cref="ConsoleCommandLine" /> starts executing.</para>
+		///     <para>Note that to echo the <see cref="ConsoleCommandLine" /> itself you can use the more specific <see cref="IsEchoingConsoleCommandLine" /> option (which prints after the custom greeting text).</para>
+		///     <para>The default is an empty string for no custom greeting.</para>
+		///     <para>This property cannot be changed when the process is running.</para>
+		/// </summary>
+		[NotNull]
+		public string GreetingText
+		{
+			get
+			{
+				return _sGreetingText;
+			}
+			set
+			{
+				if(value == null)
+					throw new ArgumentNullException(nameof(value));
+				AssertNotUsedUp();
+				_sGreetingText = value;
+			}
+		}
+
+		/// <summary>
+		///     <para>Gets or sets whether the <see cref="ConsoleCommandLine">console command line</see> will be echoed into the terminal stdout before being executed. If there's also <see cref="GreetingText" />, it goes first.</para>
 		///     <para>The default is <c>False</c>.</para>
 		///     <para>This property cannot be changed when the process is running.</para>
 		/// </summary>
