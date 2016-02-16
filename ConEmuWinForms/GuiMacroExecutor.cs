@@ -12,154 +12,87 @@ using Microsoft.Build.Utilities;
 
 namespace ConEmu.WinForms
 {
+	/// <summary>
+	///     <para>Implements calling GuiMacro to the remote ConEmu instance, and getting the result.</para>
+	///     <para>Got switching implementation for out-of-process (classic, via a console tool) and in-process (new feature which loads the helper comm DLL directly) access.</para>
+	/// </summary>
 	public unsafe class GuiMacroExecutor : IDisposable
 	{
-		[DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-		private static extern void* LoadLibrary(string libname);
+		[CanBeNull]
+		private UnsafeNativeMethods.FGuiMacro _fnGuiMacro;
 
-		[DllImport("kernel32.dll", CharSet = CharSet.Auto)]
-		private static extern bool FreeLibrary(void* hModule);
-
-		[DllImport("kernel32.dll", CharSet = CharSet.Ansi)]
-		private static extern void* GetProcAddress(void* hModule, string lpProcName);
+		[CanBeNull]
+		private void* _hConEmuCD;
 
 		/// <summary>
-		///     <code>int __stdcall GuiMacro(LPCWSTR asInstance, LPCWSTR asMacro, GuiMacroResultCallback ResultCallback = NULL);            </code>
+		/// Prevent unloads when async calls are being placed.
 		/// </summary>
-		[UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)]
-		private delegate int FGuiMacro(string asWhere, string asMacro, IntPtr ExecuteResultDelegate);
+		private readonly object _lock = new object();
 
 		/// <summary>
-		///     <code>typedef void (__stdcall* GuiMacroResultCallback)(GuiMacroResult code, LPCWSTR result);</code>
+		/// Inits the object, loads the extender DLL if known. If <c>NULL</c>, in-process operations will not be available.
 		/// </summary>
-		private delegate void FGuiMacroResultCallback(int code, [MarshalAs(UnmanagedType.LPWStr)] [NotNull] string result);
-
-		private readonly string libraryPath;
-
-		private void* hConEmuCD;
-
-		private FGuiMacro fnGuiMacro;
-
-		public string LibraryPath => libraryPath;
+		public GuiMacroExecutor([CanBeNull] string asLibrary)
+		{
+			if(!string.IsNullOrWhiteSpace(asLibrary))
+				LoadConEmuDll(asLibrary);
+		}
 
 		/// <summary>
-		/// Loads the ConEmu Console Server DLL and uses it to execute the GUI Macro, synchronously.
+		///     <para>Loads the ConEmu Console Server DLL and uses it to execute the GUI Macro.</para>
+		///     <para>The execution is async, because the call must not be placed on the same thread.</para>
 		/// </summary>
-		/// <param name="nConEmuPid"></param>
-		/// <param name="asMacro"></param>
-		/// <returns></returns>
+		[NotNull]
 		public Task<GuiMacroResult> ExecuteInProcessAsync(int nConEmuPid, [NotNull] string asMacro)
 		{
 			if(asMacro == null)
 				throw new ArgumentNullException(nameof(asMacro));
-
-			if(hConEmuCD == null)
+			if(_hConEmuCD == null) // Check on home thread
 				throw new GuiMacroException("ConEmuCD was not loaded.");
 
-			// Bring the call on another thread
-			// It creates a task which completes when the callback arrives
-			// This would work with any assumptions on the callback synchronousness, just make sure it's ever called
-			FGuiMacroResultCallback fnCallback = null;
+			// Bring the call on another thread, because placing the call on the same thread as ConEmu might cause a deadlock when it's still in the process of initialization
+			// (the GuiMacro stuff was designed for out-of-process comm and would blocking-wait for init to complete)
 			Task<Task<GuiMacroResult>> taskInitiateCall = Task.Factory.StartNew(() =>
 			{
-				var taskresult = new TaskCompletionSource<GuiMacroResult>();
-
-				fnCallback = (nCode, sResponseText) => taskresult.SetResult(new GuiMacroResult() {Response = sResponseText, IsSuccessful = nCode == 0});
-
-				int iRc = fnGuiMacro(nConEmuPid.ToString(CultureInfo.InvariantCulture), asMacro, Marshal.GetFunctionPointerForDelegate(fnCallback));
-				switch(iRc)
+				lock(_lock) // Don't allow unloading in parallel
 				{
-				case 0: // This is expected
-				case 133: // CERR_GUIMACRO_SUCCEEDED: not expected, but...
-					// OK
-					break;
-				case 134: // CERR_GUIMACRO_FAILED
-					taskresult.SetResult(new GuiMacroResult() {IsSuccessful = false});
-					break;
-				default:
-					throw new GuiMacroException($"Internal ConEmuCD error: {iRc:N0}.");
+					if(_hConEmuCD == null) // Re-check after lock-protecting from unload
+						throw new GuiMacroException("ConEmuCD has just been unloaded.");
+					if(_fnGuiMacro == null)
+						throw new GuiMacroException("The function pointer has not been bound.");
+
+					var taskresult = new TaskCompletionSource<GuiMacroResult>();
+
+					string sResult;
+					int iRc = _fnGuiMacro(nConEmuPid.ToString(CultureInfo.InvariantCulture), asMacro, out sResult);
+					switch(iRc)
+					{
+					case 0: // This is expected
+					case 133: // CERR_GUIMACRO_SUCCEEDED: not expected, but...
+						taskresult.SetResult(new GuiMacroResult() {IsSuccessful = true, Response = sResult ?? ""});
+						break;
+					case 134: // CERR_GUIMACRO_FAILED
+						taskresult.SetResult(new GuiMacroResult() {IsSuccessful = false});
+						break;
+					default:
+						throw new GuiMacroException($"Internal ConEmuCD error: {iRc:N0}.");
+					}
+
+					return taskresult.Task;
 				}
-
-				// Keep the callback alive for now
-				GC.KeepAlive(fnCallback);
-
-				return taskresult.Task;
 			});
 
 			// And this waits for the resulting task to arrive
 			Task<GuiMacroResult> taskResult = taskInitiateCall.Unwrap();
 
-			// Make sure the native thunk we pass for callback is not reclaimed too soon
-			Task<GuiMacroResult> taskResultAndKeepalive = taskResult.ContinueWith(task =>
-			{
-				// This brings the managed fn (its thunk lifetime is bound to it) into the closure and keeps it alive up until this point, which is after the callback execution
-				GC.KeepAlive(fnCallback);
-
-				// Result passthru
-				return task.Result;
-			});
-
-			return taskResultAndKeepalive;
-		}
-
-		/// <summary>
-		/// Inits the object, loads the extender DLL if known. If <c>NULL</c>, in-process operations will not be available.
-		/// </summary>
-		/// <param name="asLibrary"></param>
-		public GuiMacroExecutor([CanBeNull] string asLibrary)
-		{
-			libraryPath = asLibrary;
-			if(!string.IsNullOrEmpty(asLibrary))
-				LoadConEmuDll(asLibrary);
-		}
-
-		~GuiMacroExecutor()
-		{
-			UnloadConEmuDll();
-		}
-
-		void IDisposable.Dispose()
-		{
-			UnloadConEmuDll();
-			GC.SuppressFinalize(this);
-		}
-
-		private void LoadConEmuDll([NotNull] string asLibrary)
-		{
-			if(asLibrary == null)
-				throw new ArgumentNullException(nameof(asLibrary));
-			if(hConEmuCD != null)
-				return;
-
-			hConEmuCD = LoadLibrary(asLibrary);
-			if(hConEmuCD == null)
-			{
-				int errorCode = Marshal.GetLastWin32Error();
-				throw new GuiMacroException($"Can't load library, ErrCode={errorCode}\n{asLibrary}");
-			}
-
-			const string fnName = "GuiMacro";
-			void* exportPtr = GetProcAddress(hConEmuCD, fnName);
-			if(exportPtr == null)
-			{
-				UnloadConEmuDll();
-				throw new GuiMacroException($"Function {fnName} not found in library\n{asLibrary}\nUpdate ConEmu modules");
-			}
-			fnGuiMacro = (FGuiMacro)Marshal.GetDelegateForFunctionPointer((IntPtr)exportPtr, typeof(FGuiMacro));
-		}
-
-		private void UnloadConEmuDll()
-		{
-			if(hConEmuCD != null)
-			{
-				FreeLibrary(hConEmuCD);
-				hConEmuCD = null;
-			}
+			return taskResult;
 		}
 
 		/// <summary>
 		/// Invokes <c>ConEmuC.exe</c> to execute the GUI Macro.
+		/// The execution is asynchronous.
 		/// </summary>
+		[NotNull]
 		public Task<GuiMacroResult> ExecuteViaExtenderProcessAsync([NotNull] string macrotext, int nConEmuPid, [NotNull] string sConEmuConsoleExtenderExecutablePath)
 		{
 			if(macrotext == null)
@@ -219,12 +152,76 @@ namespace ConEmu.WinForms
 			}
 		}
 
+		void IDisposable.Dispose()
+		{
+			lock(_lock)
+				UnloadConEmuDll();
+			GC.SuppressFinalize(this);
+		}
+
+		~GuiMacroExecutor()
+		{
+			// Locking: don't take lock in the finalizer, could do nasty things, supposedly, “this” is reachable when background tasks are running
+			UnloadConEmuDll();
+		}
+
+		private void LoadConEmuDll([NotNull] string asLibrary)
+		{
+			if(asLibrary == null)
+				throw new ArgumentNullException(nameof(asLibrary));
+			if(_hConEmuCD != null)
+				return;
+
+			_hConEmuCD = UnsafeNativeMethods.LoadLibrary(asLibrary);
+			if(_hConEmuCD == null)
+			{
+				int errorCode = Marshal.GetLastWin32Error();
+				throw new GuiMacroException($"Can't load library, ErrCode={errorCode}\n{asLibrary}");
+			}
+
+			const string fnName = "GuiMacro";
+			void* exportPtr = UnsafeNativeMethods.GetProcAddress(_hConEmuCD, fnName);
+			if(exportPtr == null)
+			{
+				UnloadConEmuDll();
+				throw new GuiMacroException($"Function {fnName} not found in library\n{asLibrary}\nUpdate ConEmu modules");
+			}
+			_fnGuiMacro = (UnsafeNativeMethods.FGuiMacro)Marshal.GetDelegateForFunctionPointer((IntPtr)exportPtr, typeof(UnsafeNativeMethods.FGuiMacro));
+		}
+
+		private void UnloadConEmuDll()
+		{
+			if(_hConEmuCD != null)
+			{
+				UnsafeNativeMethods.FreeLibrary(_hConEmuCD);
+				_hConEmuCD = null;
+			}
+		}
+
 		public class GuiMacroException : Exception
 		{
 			public GuiMacroException(string asMessage)
 				: base(asMessage)
 			{
 			}
+		}
+
+		private static class UnsafeNativeMethods
+		{
+			[DllImport("kernel32.dll", CharSet = CharSet.Auto)]
+			public static extern bool FreeLibrary(void* hModule);
+
+			[DllImport("kernel32.dll", CharSet = CharSet.Ansi)]
+			public static extern void* GetProcAddress(void* hModule, string lpProcName);
+
+			[DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+			public static extern void* LoadLibrary(string libname);
+
+			/// <summary>
+			///     <code>int __stdcall GuiMacro(LPCWSTR asInstance, LPCWSTR asMacro, BSTR* bsResult = NULL);</code>
+			/// </summary>
+			[UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)]
+			public delegate int FGuiMacro([MarshalAs(UnmanagedType.LPWStr)] string asInstance, [MarshalAs(UnmanagedType.LPWStr)] string asMacro, [MarshalAs(UnmanagedType.BStr)] out string bsResult);
 		}
 	}
 }
