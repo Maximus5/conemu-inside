@@ -354,7 +354,9 @@ namespace ConEmu.WinForms
 
 			// Apply settings from properties
 			{
-				var xmlElem = ((XmlElement)(xmlSettings.SelectSingleNode("value[@name='StatusBar.Show']") ?? xmlSettings.AppendChild(xmldoc.CreateElement("value"))));
+				string keyname = "StatusBar.Show";
+				var xmlElem = ((XmlElement)(xmlSettings.SelectSingleNode($"value[@name='{keyname}']") ?? xmlSettings.AppendChild(xmldoc.CreateElement("value"))));
+				xmlElem.SetAttribute("name", keyname);
 				xmlElem.SetAttribute("type", "hex");
 				xmlElem.SetAttribute("data", (hostcontext.IsStatusbarVisibleInitial ? 1 : 0).ToString());
 			}
@@ -362,7 +364,9 @@ namespace ConEmu.WinForms
 			// Environment variables
 			if(startinfo.EnumEnv().Any())
 			{
-				var xmlElem = ((XmlElement)(xmlSettings.SelectSingleNode("value[@name='EnvironmentSet']") ?? xmlSettings.AppendChild(xmldoc.CreateElement("value"))));
+				string keyname = "EnvironmentSet";
+				var xmlElem = ((XmlElement)(xmlSettings.SelectSingleNode($"value[@name='{keyname}']") ?? xmlSettings.AppendChild(xmldoc.CreateElement("value"))));
+				xmlElem.SetAttribute("name", keyname);
 				xmlElem.SetAttribute("type", "multi");
 				foreach(string key in startinfo.EnumEnv())
 				{
