@@ -52,7 +52,7 @@ namespace ConEmu.WinForms
 
 			// Bring the call on another thread, because placing the call on the same thread as ConEmu might cause a deadlock when it's still in the process of initialization
 			// (the GuiMacro stuff was designed for out-of-process comm and would blocking-wait for init to complete)
-			Task<Task<GuiMacroResult>> taskInitiateCall = Task.Factory.StartNew(() =>
+			return Task.Factory.StartNew(() =>
 			{
 				lock(_lock) // Don't allow unloading in parallel
 				{
@@ -61,31 +61,20 @@ namespace ConEmu.WinForms
 					if(_fnGuiMacro == null)
 						throw new GuiMacroException("The function pointer has not been bound.");
 
-					var taskresult = new TaskCompletionSource<GuiMacroResult>();
-
 					string sResult;
 					int iRc = _fnGuiMacro(nConEmuPid.ToString(CultureInfo.InvariantCulture), asMacro, out sResult);
 					switch(iRc)
 					{
 					case 0: // This is expected
 					case 133: // CERR_GUIMACRO_SUCCEEDED: not expected, but...
-						taskresult.SetResult(new GuiMacroResult() {IsSuccessful = true, Response = sResult ?? ""});
-						break;
+						return new GuiMacroResult() {IsSuccessful = true, Response = sResult ?? ""};
 					case 134: // CERR_GUIMACRO_FAILED
-						taskresult.SetResult(new GuiMacroResult() {IsSuccessful = false});
-						break;
+						return new GuiMacroResult() {IsSuccessful = false};
 					default:
 						throw new GuiMacroException($"Internal ConEmuCD error: {iRc:N0}.");
 					}
-
-					return taskresult.Task;
 				}
 			});
-
-			// And this waits for the resulting task to arrive
-			Task<GuiMacroResult> taskResult = taskInitiateCall.Unwrap();
-
-			return taskResult;
 		}
 
 		/// <summary>
