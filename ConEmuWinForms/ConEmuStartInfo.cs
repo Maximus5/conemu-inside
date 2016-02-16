@@ -17,7 +17,9 @@ namespace ConEmu.WinForms
 
 		private EventHandler _consoleEmulatorExitedEventSink;
 
-		readonly IDictionary<string, string> _environment = new Dictionary<string, string>();
+		private readonly IDictionary<string, string> _environment = new Dictionary<string, string>();
+
+		private bool _isEchoingConsoleCommandLine;
 
 		private bool _isElevated;
 
@@ -172,6 +174,24 @@ namespace ConEmu.WinForms
 			{
 				AssertNotUsedUp();
 				_consoleEmulatorExitedEventSink = value;
+			}
+		}
+
+		/// <summary>
+		///     <para>Gets or sets whether the console command line will be echoed into the terminal stdout before being executed.</para>
+		///     <para>The default is <c>False</c>.</para>
+		///     <para>This property cannot be changed when the process is running.</para>
+		/// </summary>
+		public bool IsEchoingConsoleCommandLine
+		{
+			get
+			{
+				return _isEchoingConsoleCommandLine;
+			}
+			set
+			{
+				AssertNotUsedUp();
+				_isEchoingConsoleCommandLine = value;
 			}
 		}
 

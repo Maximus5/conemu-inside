@@ -5,6 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -362,7 +363,7 @@ namespace ConEmu.WinForms
 			}
 
 			// Environment variables
-			if(startinfo.EnumEnv().Any())
+			if((startinfo.EnumEnv().Any()) || (startinfo.IsEchoingConsoleCommandLine))
 			{
 				string keyname = "EnvironmentSet";
 				var xmlElem = ((XmlElement)(xmlSettings.SelectSingleNode($"value[@name='{keyname}']") ?? xmlSettings.AppendChild(xmldoc.CreateElement("value"))));
@@ -373,6 +374,18 @@ namespace ConEmu.WinForms
 					XmlElement xmlLine;
 					xmlElem.AppendChild(xmlLine = xmldoc.CreateElement("line"));
 					xmlLine.SetAttribute("data", $"set {key}={startinfo.GetEnv(key)}");
+				}
+
+				// To echo the cmdline, add an echo command to the env-init session
+				if(startinfo.IsEchoingConsoleCommandLine)
+				{
+					XmlElement xmlLine;
+					xmlElem.AppendChild(xmlLine = xmldoc.CreateElement("line"));
+
+					var cmdlEcho = new CommandLineBuilder();
+					cmdlEcho.AppendSwitch("echo");
+					cmdlEcho.AppendFileNameIfNotNull(startinfo.ConsoleCommandLine);
+					xmlLine.SetAttribute("data", cmdlEcho.ToString());
 				}
 			}
 
