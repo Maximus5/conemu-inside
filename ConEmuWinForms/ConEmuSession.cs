@@ -6,6 +6,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -178,8 +179,6 @@ namespace ConEmu.WinForms
 		/// </summary>
 		private void Init_PayloadProcessMonitoring()
 		{
-			var xmlDoc = new XmlDocument();
-
 			// Detect when payload process exits
 			Process processRoot = null; // After we know the root payload process PID, we'd wait for it to exit
 			_evtCleanupOnExit += delegate
@@ -387,10 +386,7 @@ namespace ConEmu.WinForms
 					{
 						XmlElement xmlLine;
 						xmlElem.AppendChild(xmlLine = xmldoc.CreateElement("line"));
-						var cmdlGreetingLine = new CommandLineBuilder();
-						cmdlGreetingLine.AppendSwitch("echo");
-						cmdlGreetingLine.AppendFileNameIfNotNull(line);
-						xmlLine.SetAttribute("data", cmdlGreetingLine.ToString());
+						xmlLine.SetAttribute("data", $"echo {Init_MakeConEmuCommandLine_EmitConfigFile_EscapeEchoText(line)}");
 					}
 				}
 
@@ -399,11 +395,7 @@ namespace ConEmu.WinForms
 				{
 					XmlElement xmlLine;
 					xmlElem.AppendChild(xmlLine = xmldoc.CreateElement("line"));
-
-					var cmdlEcho = new CommandLineBuilder();
-					cmdlEcho.AppendSwitch("echo");
-					cmdlEcho.AppendFileNameIfNotNull(startinfo.ConsoleCommandLine);
-					xmlLine.SetAttribute("data", cmdlEcho.ToString());
+					xmlLine.SetAttribute("data", $"echo {Init_MakeConEmuCommandLine_EmitConfigFile_EscapeEchoText(startinfo.ConsoleCommandLine)}");
 				}
 			}
 
@@ -413,6 +405,59 @@ namespace ConEmu.WinForms
 			xmldoc.Save(sConfigFile);
 
 			return sConfigFile;
+		}
+
+		/// <summary>
+		/// Applies escaping so that (1) it went as a single argument into the ConEmu's <c>NextArg</c> function; (2) its special chars were escaped according to the ConEmu's <c>DoOutput</c> function which implements this echo.
+		/// </summary>
+		private static string Init_MakeConEmuCommandLine_EmitConfigFile_EscapeEchoText([NotNull] string text)
+		{
+			if(text == null)
+				throw new ArgumentNullException(nameof(text));
+
+			var sb = new StringBuilder(text.Length + 2);
+
+			// We'd always quote the arg; no harm, and works better with an empty string
+			sb.Append('"');
+
+			foreach(char ch in text)
+			{
+				switch(ch)
+				{
+				case '"':
+					sb.Append('"').Append('"'); // Quotes are doubled in this format
+					break;
+				case '^':
+					sb.Append("^^");
+					break;
+				case '\r':
+					sb.Append("^R");
+					break;
+				case '\n':
+					sb.Append("^N");
+					break;
+				case '\t':
+					sb.Append("^T");
+					break;
+				case '\x7':
+					sb.Append("^A");
+					break;
+				case '\b':
+					sb.Append("^B");
+					break;
+				case '[':
+					sb.Append("^E");
+					break;
+				default:
+					sb.Append(ch);
+					break;
+				}
+			}
+
+			// Close arg quoting
+			sb.Append('"');
+
+			return sb.ToString();
 		}
 
 		/// <summary>
