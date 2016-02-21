@@ -6,6 +6,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
+using ConEmu.WinForms.Util;
+
 using JetBrains.Annotations;
 
 using Microsoft.Build.Utilities;
@@ -19,7 +21,7 @@ namespace ConEmu.WinForms
 	public unsafe class GuiMacroExecutor : IDisposable
 	{
 		[CanBeNull]
-		private UnsafeNativeMethods.FGuiMacro _fnGuiMacro;
+		private FGuiMacro _fnGuiMacro;
 
 		[CanBeNull]
 		private void* _hConEmuCD;
@@ -34,7 +36,7 @@ namespace ConEmu.WinForms
 		/// </summary>
 		public GuiMacroExecutor([CanBeNull] string asLibrary)
 		{
-			if(!string.IsNullOrWhiteSpace(asLibrary))
+			if(!String.IsNullOrWhiteSpace(asLibrary))
 				LoadConEmuDll(asLibrary);
 		}
 
@@ -161,7 +163,7 @@ namespace ConEmu.WinForms
 			if(_hConEmuCD != null)
 				return;
 
-			_hConEmuCD = UnsafeNativeMethods.LoadLibrary(asLibrary);
+			_hConEmuCD = WinApi.LoadLibrary(asLibrary);
 			if(_hConEmuCD == null)
 			{
 				int errorCode = Marshal.GetLastWin32Error();
@@ -169,23 +171,29 @@ namespace ConEmu.WinForms
 			}
 
 			const string fnName = "GuiMacro";
-			void* exportPtr = UnsafeNativeMethods.GetProcAddress(_hConEmuCD, fnName);
+			void* exportPtr = WinApi.GetProcAddress(_hConEmuCD, fnName);
 			if(exportPtr == null)
 			{
 				UnloadConEmuDll();
 				throw new GuiMacroException($"Function {fnName} not found in library\n{asLibrary}\nUpdate ConEmu modules");
 			}
-			_fnGuiMacro = (UnsafeNativeMethods.FGuiMacro)Marshal.GetDelegateForFunctionPointer((IntPtr)exportPtr, typeof(UnsafeNativeMethods.FGuiMacro));
+			_fnGuiMacro = (FGuiMacro)Marshal.GetDelegateForFunctionPointer((IntPtr)exportPtr, typeof(FGuiMacro));
 		}
 
 		private void UnloadConEmuDll()
 		{
 			if(_hConEmuCD != null)
 			{
-				UnsafeNativeMethods.FreeLibrary(_hConEmuCD);
+				WinApi.FreeLibrary(_hConEmuCD);
 				_hConEmuCD = null;
 			}
 		}
+
+		/// <summary>
+		///     <code>int __stdcall GuiMacro(LPCWSTR asInstance, LPCWSTR asMacro, BSTR* bsResult = NULL);</code>
+		/// </summary>
+		[UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)]
+		private delegate int FGuiMacro([MarshalAs(UnmanagedType.LPWStr)] string asInstance, [MarshalAs(UnmanagedType.LPWStr)] string asMacro, [MarshalAs(UnmanagedType.BStr)] out string bsResult);
 
 		public class GuiMacroException : Exception
 		{
@@ -193,24 +201,6 @@ namespace ConEmu.WinForms
 				: base(asMessage)
 			{
 			}
-		}
-
-		private static class UnsafeNativeMethods
-		{
-			[DllImport("kernel32.dll", CharSet = CharSet.Auto)]
-			public static extern bool FreeLibrary(void* hModule);
-
-			[DllImport("kernel32.dll", CharSet = CharSet.Ansi)]
-			public static extern void* GetProcAddress(void* hModule, string lpProcName);
-
-			[DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-			public static extern void* LoadLibrary(string libname);
-
-			/// <summary>
-			///     <code>int __stdcall GuiMacro(LPCWSTR asInstance, LPCWSTR asMacro, BSTR* bsResult = NULL);</code>
-			/// </summary>
-			[UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)]
-			public delegate int FGuiMacro([MarshalAs(UnmanagedType.LPWStr)] string asInstance, [MarshalAs(UnmanagedType.LPWStr)] string asMacro, [MarshalAs(UnmanagedType.BStr)] out string bsResult);
 		}
 	}
 }
