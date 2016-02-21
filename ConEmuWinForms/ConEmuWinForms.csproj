@@ -65,6 +65,8 @@
     </Compile>
     <Compile Include="States.cs" />
     <Compile Include="Util\CommandLineBuilder.cs" />
+    <Compile Include="Util\TaskHelpers.cs" />
+    <Compile Include="Util\WinApi.cs" />
     <Compile Include="WhenPayloadProcessExits.cs" />
   </ItemGroup>
   <ItemGroup>
