@@ -32,6 +32,9 @@ namespace ConEmuInside
 			stack.Controls.Add(btn = new Button() {Text = "Paste Command", AutoSize = true, Dock = DockStyle.Left});
 			btn.Click += delegate { conemu.RunningSession?.WriteInputText("whois microsoft.com" + Environment.NewLine); };
 
+			stack.Controls.Add(btn = new Button() {Text = "Write StdOut", AutoSize = true, Dock = DockStyle.Left});
+			btn.Click += delegate { conemu.RunningSession?.WriteOutputText("\x001B7\x001B[90mEcho \"Hello world!\"\x001B[m\x001B8"); };
+
 			stack.Controls.Add(btn = new Button() {Text = "Query HWND", AutoSize = true, Dock = DockStyle.Left});
 			btn.Click += delegate { conemu.RunningSession?.BeginGuiMacro("GetInfo").WithParam("HWND").ExecuteAsync().ContinueWith(task => txt.Text = $"ConEmu HWND: {Regex.Replace(task.Result.Response, "\\s+", " ")}", TaskScheduler.FromCurrentSynchronizationContext()); };
 
