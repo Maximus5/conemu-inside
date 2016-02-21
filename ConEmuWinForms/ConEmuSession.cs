@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -69,8 +70,10 @@ namespace ConEmu.WinForms
 			_dirLocalTempRoot = new DirectoryInfo(Path.Combine(Path.Combine(Path.GetTempPath(), "ConEmu"), $"{DateTime.UtcNow.ToString("s").Replace(':', '-')}.{Process.GetCurrentProcess().Id:X8}.{unchecked((uint)RuntimeHelpers.GetHashCode(this)):X8}")); // Prefixed with date-sortable; then PID; then sync table id of this object
 
 			// Events wiring: make sure sinks pre-installed with start-info also get notified
+			PayloadExited += (sender, args) => _taskConsolePayloadExit.SetResult(args);
 			if(startinfo.PayloadExitedEventSink != null)
 				PayloadExited += startinfo.PayloadExitedEventSink;
+			ConsoleEmulatorExited += delegate { _taskConsoleEmulatorExit.SetResult(Missing.Value); };
 			if(startinfo.ConsoleEmulatorExitedEventSink != null)
 				ConsoleEmulatorExited += startinfo.ConsoleEmulatorExitedEventSink;
 
@@ -591,6 +594,12 @@ namespace ConEmu.WinForms
 		/// </summary>
 		private EventHandler _evtCleanupOnExit;
 
+		[NotNull]
+		private readonly TaskCompletionSource<Missing> _taskConsoleEmulatorExit = new TaskCompletionSource<Missing>(TaskCreationOptions.LongRunning);
+
+		[NotNull]
+		private readonly TaskCompletionSource<ProcessExitedEventArgs> _taskConsolePayloadExit = new TaskCompletionSource<ProcessExitedEventArgs>(TaskCreationOptions.LongRunning);
+
 		/// <summary>
 		/// Kills the whole console emulator process if it is running. This also terminates the console emulator window.	// TODO: kill payload process only when we know its pid
 		/// </summary>
@@ -632,16 +641,34 @@ namespace ConEmu.WinForms
 
 		/// <summary>
 		///     <para>Fires when the console emulator process exits and stops rendering the terminal view. Note that the root command might have had stopped running long before this moment if not <see cref="WhenPayloadProcessExits.CloseTerminal" /> prevents terminating the terminal view immediately.</para>
-		///     <para>For short-lived processes, this event might fire before you sink it. To get notified reliably, use <see cref="ConEmuStartInfo.ConsoleEmulatorExitedEventSink" />.</para>
+		///     <para>For short-lived processes, this event might fire before you sink it. To get notified reliably, use <see cref="WaitForConsoleEmulatorExitAsync" /> or <see cref="ConEmuStartInfo.ConsoleEmulatorExitedEventSink" />.</para>
 		/// </summary>
 		public event EventHandler ConsoleEmulatorExited;
 
 		/// <summary>
+		///     <para>Waits until the console emulator process exits and stops rendering the terminal view, or completes immediately if it has already exited.</para>
+		/// </summary>
+		[NotNull]
+		public Task WaitForConsoleEmulatorExitAsync()
+		{
+			return _taskConsoleEmulatorExit.Task;
+		}
+
+		/// <summary>
 		///     <para>Fires when the payload command exits within the terminal. If not <see cref="WhenPayloadProcessExits.CloseTerminal" />, the terminal stays, otherwise it closes also.</para>
-		///     <para>For short-lived processes, this event might fire before you sink it. To get notified reliably, use <see cref="ConEmuStartInfo.PayloadExitedEventSink" />.</para>
+		///     <para>For short-lived processes, this event might fire before you sink it. To get notified reliably, use <see cref="WaitForConsolePayloadExitAsync" /> or <see cref="ConEmuStartInfo.PayloadExitedEventSink" />.</para>
 		///     <para>If you're reading the ANSI log with <see cref="AnsiStreamChunkReceived" />, it's guaranteed that all the events for the log will be fired before <see cref="PayloadExited" />, and there will be no events afterwards.</para>
 		/// </summary>
 		public event EventHandler<ProcessExitedEventArgs> PayloadExited;
+
+		/// <summary>
+		/// Waits for the payload console command to exit within the terminal, or completes immediately if it has already exited. If not <see cref="WhenPayloadProcessExits.CloseTerminal" />, the terminal stays, otherwise it closes also.
+		/// </summary>
+		[NotNull]
+		public Task WaitForConsolePayloadExitAsync()
+		{
+			return _taskConsolePayloadExit.Task;
+		}
 
 		public class HostContext
 		{
