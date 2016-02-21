@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using System.Windows.Forms;
+
+using ConEmu.WinForms.Util;
 
 using JetBrains.Annotations;
 
@@ -32,13 +32,14 @@ namespace ConEmu.WinForms
 			SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.Opaque | ControlStyles.Selectable, true);
 
 			// Prevent downsizing to zero because the current ConEmu implementation asserts on its HWND having positive dimensions
+#pragma warning disable once VirtualMemberCallInContructor
 			MinimumSize = new Size(1, 1);
 		}
 
 		/// <summary>
 		///     <para>Gets or sets whether this control will start the console process as soon as it's loaded on the form: yes if non-<c>NULL</c>, and no if <c>NULL</c>.</para>
 		///     <para>Set this to <c>NULL</c> to prevent the terminal emulator from opening automatically. Adjust this object or assign a new one to setup the initial terminal emulator.</para>
-		///     <para>You can either specify the console executable to run in <see cref="ConEmuStartInfo.ConsoleCommandLine" /> (the console window will close as soon as it exits), or use its default value <see cref="ConEmuConstants.DefaultConsoleCommandLine" /> for the default Windows console and execute your command in that console with <see cref="PasteText" /> (the console will remain operable after the command completes).</para>
+		///     <para>You can either specify the console executable to run in <see cref="ConEmuStartInfo.ConsoleCommandLine" /> (the console window will close as soon as it exits), or use its default value <see cref="ConEmuConstants.DefaultConsoleCommandLine" /> for the default Windows console and execute your command in that console with <see cref="ConEmuSession.WriteInputText" /> (the console will remain operable after the command completes).</para>
 		/// </summary>
 		/// <remarks>
 		///     <para>This object cannot be changed after the console emulator starts. The value of the property becomes <c>NULL</c> and cannot be changed either.</para>
@@ -64,15 +65,8 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		/// Gets the state of the console emulator.
+		/// Gets or sets whether the status bar should be visible in the terminal (when it's open in the control).
 		/// </summary>
-		public States ConsoleState => _running != null ? States.Running : (_isEverRun ? States.Exited : States.Empty);
-
-		/// <summary>
-		/// Whether the console process is currently running.
-		/// </summary>
-		public bool IsConsoleProcessRunning => _running != null; // TODO: if the process is still running inside conemu
-
 		public bool IsStatusbarVisible
 		{
 			get
@@ -82,87 +76,46 @@ namespace ConEmu.WinForms
 			set
 			{
 				_isStatusbarVisible = value;
-				if(_running != null)
-					BeginGuiMacro("Status").WithParam(0).WithParam(value ? 1 : 2).ExecuteAsync();
+				_running?.BeginGuiMacro("Status").WithParam(0).WithParam(value ? 1 : 2).ExecuteAsync();
 			}
 		}
 
 		/// <summary>
-		/// Gets the exit code of the most recently terminated console process.
+		///     <para>Gets the exit code of the most recently terminated console process.</para>
+		///     <para><c>NULL</c> if no console process has exited in this control yet.</para>
+		///     <para>Note that a console process is currently running in the terminal you'd be getting the previous exit code until it exits.</para>
 		/// </summary>
-		public int LastExitCode
+		public int? LastExitCode
 		{
 			get
 			{
-				if(!_isEverRun)
-					throw new InvalidOperationException("The console process has never run in this control.");
-
 				// Special case for just-exited payload: user might get the payload-exited event before us and call this property to get its exit code, while we have not recorded the fresh exit code yet
 				// So call into the current session and fetch the actual value, if available (no need to write to field, will update in our event handler soon)
 				ConEmuSession running = _running;
 				if((running != null) && (running.IsPayloadExited))
 					return running.GetPayloadExitCode();
-
-				return _nLastExitCode;
+				return _isEverRun ? _nLastExitCode : default(int?); // No terminal open or current process still running in the terminal, use prev exit code if there were
 			}
 		}
 
 		/// <summary>
-		///     <para>Gets the running session, or <c>NULL</c>, if there is currently none.</para>
-		///     <para>To get the running session object in a reliable way for possibly short-running sessions, call <see cref="Start" /> explicitly.</para>
+		///     <para>Gets the running terminal session, or <c>NULL</c>, if there is currently none.</para>
+		///     <para>A session represents an open terminal displayed in the control, in which a console process is either still running, or has already exited.</para>
+		///     <para>To get the running session object in a reliable way for possibly short-running sessions, call <see cref="Start" /> explicitly, and pass in the event sinks.</para>
 		/// </summary>
 		[CanBeNull]
 		public ConEmuSession RunningSession => _running;
 
 		/// <summary>
-		/// Starts construction of the ConEmu GUI Macro.
+		///     <para>Gets the current state of the control regarding what's running in it.</para>
+		///     <para>This only changes on the main thread.</para>
 		/// </summary>
-		[Pure]
-		public GuiMacroBuilder BeginGuiMacro([NotNull] string sMacroName)
-		{
-			if(sMacroName == null)
-				throw new ArgumentNullException(nameof(sMacroName));
-
-			return new GuiMacroBuilder(GetRunningSession(), sMacroName, Enumerable.Empty<string>());
-		}
+		public States TerminalState => _running != null ? (_running.IsPayloadExited ? States.DetachedTerminal : States.TerminalWithConsoleProcess) : (_isEverRun ? States.Exited : States.Empty);
 
 		/// <summary>
-		/// The EnumChildWindows function enumerates the child windows that belong to the specified parent window by passing the handle to each child window, in turn, to an application-defined callback function. EnumChildWindows continues until the last child window is enumerated or the callback function returns FALSE.
+		/// Gets whether there is an open terminal displayed in the control. Of <see cref="TerminalState" />, that's either <see cref="States.TerminalWithConsoleProcess" /> or <see cref="States.DetachedTerminal" />.
 		/// </summary>
-		/// <param name="hWndParent">[in] Handle to the parent window whose child windows are to be enumerated. If this parameter is NULL, this function is equivalent to EnumWindows. Windows 95/98/Me: hWndParent cannot be NULL.</param>
-		/// <param name="lpEnumFunc">[in] Pointer to an application-defined callback function. For more information, see EnumChildProc.</param>
-		/// <param name="lParam">[in] Specifies an application-defined value to be passed to the callback function.</param>
-		/// <returns>Not used.</returns>
-		/// <remarks>If a child window has created child windows of its own, EnumChildWindows enumerates those windows as well. A child window that is moved or repositioned in the Z order during the enumeration process will be properly enumerated. The function does not enumerate a child window that is destroyed before being enumerated or that is created during the enumeration process. </remarks>
-		[DllImport("user32.dll", CharSet = CharSet.Unicode, PreserveSig = true, SetLastError = true, ExactSpelling = true)]
-		public static extern Int32 EnumChildWindows(void* hWndParent, void* lpEnumFunc, IntPtr lParam);
-
-		/// <summary>
-		/// Executes a ConEmu GUI Macro on the active console, see http://conemu.github.io/en/GuiMacro.html .
-		/// </summary>
-		/// <param name="macrotext">The full macro command, see http://conemu.github.io/en/GuiMacro.html .</param>
-		public Task<GuiMacroResult> ExecuteGuiMacroTextAsync([NotNull] string macrotext)
-		{
-			return GetRunningSession().ExecuteGuiMacroTextAsync(macrotext);
-		}
-
-		public void PasteText([NotNull] string text)
-		{
-			if(text == null)
-				throw new ArgumentNullException(nameof(text));
-			if(text.Length == 0)
-				return;
-
-			BeginGuiMacro("Paste").WithParam(2).WithParam(text).ExecuteAsync();
-		}
-
-		/// <summary>
-		/// The SetFocus function sets the keyboard focus to the specified window. The window must be attached to the calling thread's message queue. The SetFocus function sends a WM_KILLFOCUS message to the window that loses the keyboard focus and a WM_SETFOCUS message to the window that receives the keyboard focus. It also activates either the window that receives the focus or the parent of the window that receives the focus. If a window is active but does not have the focus, any key pressed will produce the WM_SYSCHAR, WM_SYSKEYDOWN, or WM_SYSKEYUP message. If the VK_MENU key is also pressed, the lParam parameter of the message will have bit 30 set. Otherwise, the messages produced do not have this bit set. By using the AttachThreadInput function, a thread can attach its input processing to another thread. This allows a thread to call SetFocus to set the keyboard focus to a window attached to another thread's message queue.
-		/// </summary>
-		/// <param name="hWnd">[in] Handle to the window that will receive the keyboard input. If this parameter is NULL, keystrokes are ignored. </param>
-		/// <returns>If the function succeeds, the return value is the handle to the window that previously had the keyboard focus. If the hWnd parameter is invalid or the window is not attached to the calling thread's message queue, the return value is NULL. To get extended error information, call GetLastError.</returns>
-		[DllImport("user32.dll", CharSet = CharSet.Unicode, PreserveSig = true, SetLastError = false, ExactSpelling = true)]
-		public static extern void* SetFocus(void* hWnd);
+		public bool IsTerminalOpen => _running != null;
 
 		/// <summary>
 		/// Starts a new console process in the console emulator control.
@@ -181,7 +134,7 @@ namespace ConEmu.WinForms
 			var session = new ConEmuSession(startinfo, new ConEmuSession.HostContext((void*)Handle, IsStatusbarVisible));
 			_running = session;
 			_isEverRun = true;
-			ConsoleStateChanged?.Invoke(this, EventArgs.Empty);
+			TerminalStateChanged?.Invoke(this, EventArgs.Empty);
 
 			session.ConsoleEmulatorExited += delegate
 			{
@@ -195,7 +148,7 @@ namespace ConEmu.WinForms
 				}
 				_running = null;
 				Invalidate();
-				ConsoleStateChanged?.Invoke(this, EventArgs.Empty);
+				TerminalStateChanged?.Invoke(this, EventArgs.Empty);
 			};
 			return session;
 		}
@@ -206,8 +159,6 @@ namespace ConEmu.WinForms
 			if(_running != null)
 				throw new InvalidOperationException("This change is not possible when a console process is already running.");
 		}
-
-		public event EventHandler ConsoleStateChanged;
 
 		protected override void Dispose(bool disposing)
 		{
@@ -227,22 +178,13 @@ namespace ConEmu.WinForms
 			}
 		}
 
-		[NotNull]
-		private ConEmuSession GetRunningSession()
-		{
-			ConEmuSession session = _running;
-			if(session == null)
-				throw new InvalidOperationException("This operation cannot be executed because the terminal emulator session is not running at the moment.");
-			return session;
-		}
-
 		protected override void OnGotFocus(EventArgs e)
 		{
 			base.OnGotFocus(e);
 
 			void* hwnd = TryGetConEmuHwnd();
 			if(hwnd != null)
-				SetFocus(hwnd);
+				WinApi.SetFocus(hwnd);
 		}
 
 		protected override void OnHandleCreated(EventArgs e)
@@ -260,27 +202,23 @@ namespace ConEmu.WinForms
 			args.Graphics.FillRectangle(SystemBrushes.ControlDark, args.ClipRectangle);
 		}
 
+		/// <summary>
+		/// Fires on the main thread whenever <see cref="TerminalState" /> changes.
+		/// </summary>
+		public event EventHandler TerminalStateChanged;
+
 		[CanBeNull]
 		private void* TryGetConEmuHwnd()
 		{
 			void* hwndConEmu = null;
-			EnumWindowsProc callback = (hwnd, param) =>
+			WinApi.EnumWindowsProc callback = (hwnd, param) =>
 			{
 				*((void**)param) = hwnd;
 				return 0;
 			};
-			EnumChildWindows((void*)Handle, (void*)Marshal.GetFunctionPointerForDelegate(callback), (IntPtr)(&hwndConEmu));
+			WinApi.EnumChildWindows((void*)Handle, (void*)Marshal.GetFunctionPointerForDelegate(callback), (IntPtr)(&hwndConEmu));
 			GC.KeepAlive(callback);
 			return hwndConEmu;
 		}
-
-		/// <summary>
-		/// The EnumWindowsProc function is an application-defined callback function used with the EnumWindows or EnumDesktopWindows function. It receives top-level window handles. The WNDENUMPROC type defines a pointer to this callback function. EnumWindowsProc is a placeholder for the application-defined function name.
-		/// </summary>
-		/// <param name="hwnd">[in] Handle to a top-level window. </param>
-		/// <param name="lParam">[in] Specifies the application-defined value given in EnumWindows or EnumDesktopWindows. </param>
-		/// <returns>To continue enumeration, the callback function must return TRUE; to stop enumeration, it must return FALSE.</returns>
-		/// <remarks>An application must register this callback function by passing its address to EnumWindows or EnumDesktopWindows. </remarks>
-		public delegate Int32 EnumWindowsProc(void* hwnd, IntPtr lParam);
 	}
 }

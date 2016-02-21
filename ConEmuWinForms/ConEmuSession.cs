@@ -13,6 +13,8 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml;
 
+using ConEmu.WinForms.Util;
+
 using JetBrains.Annotations;
 
 using Microsoft.Build.Utilities;
@@ -22,7 +24,8 @@ using Timer = System.Windows.Forms.Timer;
 namespace ConEmu.WinForms
 {
 	/// <summary>
-	/// A single session of the console emulator run. Each top-level command execution spawns a new session.
+	///     <para>A single session of the console emulator run. Each top-level command execution in the control spawns a new terminal and a new session.</para>
+	///     <para>After the terminal closes, the session is done with. The console payload process might exit before that point.</para>
 	/// </summary>
 	public unsafe class ConEmuSession
 	{
@@ -488,7 +491,7 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		/// Starts construction of the ConEmu GUI Macro.
+		/// Starts construction of the ConEmu GUI Macro, see http://conemu.github.io/en/GuiMacro.html .
 		/// </summary>
 		[Pure]
 		public GuiMacroBuilder BeginGuiMacro([NotNull] string sMacroName)
@@ -497,6 +500,34 @@ namespace ConEmu.WinForms
 				throw new ArgumentNullException(nameof(sMacroName));
 
 			return new GuiMacroBuilder(this, sMacroName, Enumerable.Empty<string>());
+		}
+
+		/// <summary>
+		///     <para>Writes text to the console input, as if it's been typed by user on the keyboard.</para>
+		///     <para>Whether this will be visible (=echoed) on screen is up to the running console process.</para>
+		/// </summary>
+		public Task WriteInputText([NotNull] string text)
+		{
+			if(text == null)
+				throw new ArgumentNullException(nameof(text));
+			if(text.Length == 0)
+				return TaskHelpers.CompletedTask;
+
+			return BeginGuiMacro("Paste").WithParam(2).WithParam(text).ExecuteAsync();
+		}
+
+		/// <summary>
+		///     <para>Writes text to the console output, as if the current running console process has written it to stdout.</para>
+		///     <para>Use with caution, as this might interfere with console process output in an unpredictable manner.</para>
+		/// </summary>
+		public Task WriteOutputText([NotNull] string text)
+		{
+			if(text == null)
+				throw new ArgumentNullException(nameof(text));
+			if(text.Length == 0)
+				return TaskHelpers.CompletedTask;
+
+			return BeginGuiMacro("Write").WithParam(text).ExecuteAsync();
 		}
 
 		/// <summary>

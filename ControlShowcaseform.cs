@@ -30,13 +30,13 @@ namespace ConEmuInside
 
 			Button btn;
 			stack.Controls.Add(btn = new Button() {Text = "Paste Command", AutoSize = true, Dock = DockStyle.Left});
-			btn.Click += delegate { conemu.PasteText("whois microsoft.com" + Environment.NewLine); };
+			btn.Click += delegate { conemu.RunningSession?.WriteInputText("whois microsoft.com" + Environment.NewLine); };
 
 			stack.Controls.Add(btn = new Button() {Text = "Query HWND", AutoSize = true, Dock = DockStyle.Left});
-			btn.Click += delegate { conemu.BeginGuiMacro("GetInfo").WithParam("HWND").ExecuteAsync().ContinueWith(task => txt.Text = $"ConEmu HWND: {Regex.Replace(task.Result.Response, "\\s+", " ")}", TaskScheduler.FromCurrentSynchronizationContext()); };
+			btn.Click += delegate { conemu.RunningSession?.BeginGuiMacro("GetInfo").WithParam("HWND").ExecuteAsync().ContinueWith(task => txt.Text = $"ConEmu HWND: {Regex.Replace(task.Result.Response, "\\s+", " ")}", TaskScheduler.FromCurrentSynchronizationContext()); };
 
 			stack.Controls.Add(btn = new Button() {Text = "Query PID", AutoSize = true, Dock = DockStyle.Left});
-			btn.Click += delegate { conemu.BeginGuiMacro("GetInfo").WithParam("PID").ExecuteAsync().ContinueWith(task => txt.Text = $"ConEmu PID: {Regex.Replace(task.Result.Response, "\\s+", " ")}", TaskScheduler.FromCurrentSynchronizationContext()); };
+			btn.Click += delegate { conemu.RunningSession?.BeginGuiMacro("GetInfo").WithParam("PID").ExecuteAsync().ContinueWith(task => txt.Text = $"ConEmu PID: {Regex.Replace(task.Result.Response, "\\s+", " ")}", TaskScheduler.FromCurrentSynchronizationContext()); };
 
 			CheckBox checkStatusBar;
 			stack.Controls.Add(checkStatusBar = new CheckBox() {Text = "StatusBar", Checked = conemu.IsStatusbarVisible});
@@ -47,7 +47,7 @@ namespace ConEmuInside
 			stack.Controls.Add(btn = new Button() {Text = "&Ping", AutoSize = true, Dock = DockStyle.Left});
 			btn.Click += delegate
 			{
-				if(conemu.IsConsoleProcessRunning)
+				if(conemu.IsTerminalOpen)
 				{
 					MessageBox.Show(this, "The console is busy right now.", "Ping", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 					return;
