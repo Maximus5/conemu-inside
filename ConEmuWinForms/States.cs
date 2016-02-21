@@ -1,19 +1,32 @@
 namespace ConEmu.WinForms
 {
+	/// <summary>
+	/// <see cref="ConEmuControl"/> states.
+	/// </summary>
 	public enum States
 	{
 		/// <summary>
-		/// There has been no console process executed in this control yet.
+		///     <para>There has been no terminal opened in this control yet.</para>
+		///     <para>The control is now empty, and <see cref="ConEmuControl.RunningSession" /> is <c>NULL</c>.</para>
 		/// </summary>
 		Empty,
 
 		/// <summary>
-		/// The console process is currently running.
+		///     <para>The terminal is open, and the payload console process is running in it.</para>
+		///     <para><see cref="ConEmuControl.RunningSession" /> is available.</para>
 		/// </summary>
-		Running,
+		TerminalWithConsoleProcess,
 
 		/// <summary>
-		/// The console process has been run in this control, but has exited.
+		///     <para>The terminal is still open, but the payload console process in it has already exited.</para>
+		///     <para>The terminal stays open in this case if <see cref="ConEmuStartInfo.WhenPayloadProcessExits" /> allows it.</para>
+		///     <para><see cref="ConEmuControl.RunningSession" /> is available.</para>
+		/// </summary>
+		DetachedTerminal,
+
+		/// <summary>
+		///     <para>There were a terminal in this control, but its payload console process has exited, and the terminal has closed.</para>
+		///     <para>The control is now empty, and <see cref="ConEmuControl.RunningSession" /> is <c>NULL</c>.</para>
 		/// </summary>
 		Exited
 	}
