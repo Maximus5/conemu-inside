@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -226,34 +227,45 @@ namespace ConEmu.WinForms
 							return;
 
 						// Interpret the string as XML
-						/*
-						xmlDoc.LoadXml(result.Response);
-
+						var xmlDoc = new XmlDocument();
+						try
+						{
+							xmlDoc.LoadXml(result.Response);
+						}
+						catch(Exception)
+						{
+							// Could not parse the XML response. Not expected. Wait more.
+							return;
+						}
 						XmlElement xmlRoot = xmlDoc.DocumentElement;
 						if(xmlRoot == null)
 							return;
 
 						Trace.WriteLine($"ROOT: {xmlRoot.OuterXml}");
-*/
 
 						// Current possible records:
-						// <Root	"Name"="cmd.exe"/>
-						// <Root	"Name"="cmd.exe"	"Running": true	"PID""6812"	"ExitCode""259"	"UpTime"="7735"/>
-						// <Root	"Name"="cmd.exe"	"Running": false	"PID""6812"	"ExitCode""0"	"UpTime"="7751"/>
+						// <Root Name="cmd.exe" />
+						// <Root Name="cmd.exe" Running="true" PID="22088" ExitCode="259" UpTime="688343" />
+						// <Root Name="cmd.exe" Running="false" PID="22088" ExitCode="0" UpTime="688343" />
 						// Interested of the latter two only
 
-						Match match = Regex.Match(result.Response, @".*Running\W+(?<IsRunning>true|false).*PID\W+(?<Pid>\d+)(.*ExitCode\W+(?<ExitCode>-?\d+))?.*", RegexOptions.IgnoreCase);
-						if(!match.Success)
-							return;
-
-						bool isRunning = bool.Parse(match.Groups["IsRunning"].Value);
+						bool isRunning;
+						if(!bool.TryParse(xmlRoot.GetAttribute("Running"), out isRunning))
+							return; // Might mean the process hasn't started yet, in which case we get an empty attr and can't parse it
 
 						if(isRunning)
 						{
 							// Monitor a running process
-							int nPid = int.Parse(match.Groups["Pid"].Value);
-							processRoot = Process.GetProcessById(nPid);
-							// Migth sink its Exited event (when we got Tasks here e.g.), but for now it's simpler to reuse the same polling timer
+							try
+							{
+								int nPid = int.Parse(xmlRoot.GetAttribute("PID"));
+								processRoot = Process.GetProcessById(nPid);
+								// TODO: Might sink its Exited event (when we got Tasks here e.g.), but for now it's simpler to reuse the same polling timer
+							}
+							catch(Exception)
+							{
+								// Couldn't get hold of the process, wait to retry
+							}
 						}
 						else // Means done running the payload process in ConEmu, all done
 						{
@@ -262,8 +274,9 @@ namespace ConEmu.WinForms
 							_ansilog?.Dispose();
 
 							// Fetch exit code
-							if(match.Groups["ExitCode"].Success)
-								_nPayloadExitCode = int.Parse(match.Groups["ExitCode"].Value);
+							int nExitCode;
+							if(int.TryParse(xmlRoot.GetAttribute("ExitCode"), NumberStyles.Integer, NumberFormatInfo.InvariantInfo, out nExitCode))
+								_nPayloadExitCode = nExitCode;
 							_isPayloadExited = true;
 
 							// Notify user
