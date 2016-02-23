@@ -241,8 +241,6 @@ namespace ConEmu.WinForms
 						if(xmlRoot == null)
 							return;
 
-						Trace.WriteLine($"ROOT: {xmlRoot.OuterXml}");
-
 						// Current possible records:
 						// <Root Name="cmd.exe" />
 						// <Root Name="cmd.exe" Running="true" PID="22088" ExitCode="259" UpTime="688343" />
@@ -621,12 +619,86 @@ namespace ConEmu.WinForms
 			try
 			{
 				if(!_process.HasExited)
-					_process.Kill();
+					BeginGuiMacro("Close").WithParam(1 /*terminate active process*/).WithParam(1 /*without confirmation*/).ExecuteSync();
 			}
 			catch(Exception)
 			{
 				// Might be a race, so in between HasExited and Kill state could change, ignore possible errors here
 			}
+		}
+
+		/// <summary>
+		///     <para>Kills the console payload process, if it's running.</para>
+		///     <para>This does not necessarily kill the console emulator process which displays the console window, but it might also close if <see cref="ConEmuStartInfo.WhenPayloadProcessExits" /> says so.</para>
+		/// </summary>
+		[NotNull]
+		public Task<bool> KillConsolePayloadProcessAsync()
+		{
+			try
+			{
+				if((!_process.HasExited) && (!_isPayloadExited))
+				{
+					return GetInfoRoot.QueryAsync(this).ContinueWith(task =>
+					{
+						if(task.Status != TaskStatus.RanToCompletion)
+							return false;
+						if(!task.Result.Pid.HasValue)
+							return false;
+						try
+						{
+							Process.GetProcessById(task.Result.Pid.Value).Kill();
+						}
+						catch(Exception)
+						{
+							// Most likely, has already exited
+						}
+						return true;
+					});
+				}
+			}
+			catch(Exception)
+			{
+				// Might be a race, so in between HasExited and Kill state could change, ignore possible errors here
+			}
+			var tcs = new TaskCompletionSource<bool>();
+			tcs.SetResult(true);
+			return tcs.Task;
+		}
+
+		/// <summary>
+		/// <para>Sends the Control+C signal to the payload console process, which will most likely abort it.</para>
+		/// <para>Unlike <see cref="KillConsolePayloadProcessAsync"/>, this is a soft signal which might be processed by the console process for a graceful shutdown, or ignored altogether.</para>
+		/// </summary>
+		public Task SendControlCAsync()
+		{
+			try
+			{
+				if(!_process.HasExited)
+					return BeginGuiMacro("Break").WithParam(0 /* Ctrl+C */).ExecuteAsync();
+			}
+			catch(Exception)
+			{
+				// Might be a race, so in between HasExited and Kill state could change, ignore possible errors here
+			}
+			return TaskHelpers.CompletedTask;
+		}
+
+		/// <summary>
+		/// <para>Sends the Control+Break signal to the payload console process, which will most likely abort it.</para>
+		/// <para>Unlike <see cref="KillConsolePayloadProcessAsync"/>, this is a soft signal which might be processed by the console process for a graceful shutdown, or ignored altogether.</para>
+		/// </summary>
+		public Task SendControlBreakAsync()
+		{
+			try
+			{
+				if(!_process.HasExited)
+					return BeginGuiMacro("Break").WithParam(1 /* Ctrl+Break */).ExecuteAsync();
+			}
+			catch(Exception)
+			{
+				// Might be a race, so in between HasExited and Kill state could change, ignore possible errors here
+			}
+			return TaskHelpers.CompletedTask;
 		}
 
 		/// <summary>

@@ -41,6 +41,12 @@ namespace ConEmuInside
 			stack.Controls.Add(btn = new Button() {Text = "Query PID", AutoSize = true, Dock = DockStyle.Left});
 			btn.Click += delegate { conemu.RunningSession?.BeginGuiMacro("GetInfo").WithParam("PID").ExecuteAsync().ContinueWith(task => txt.Text = $"ConEmu PID: {Regex.Replace(task.Result.Response, "\\s+", " ")}", TaskScheduler.FromCurrentSynchronizationContext()); };
 
+			stack.Controls.Add(btn = new Button() {Text = "Kill Payload", AutoSize = true, Dock = DockStyle.Left});
+			btn.Click += delegate { conemu.RunningSession?.KillConsolePayloadProcessAsync(); };
+
+			stack.Controls.Add(btn = new Button() {Text = "Ctrl+C", AutoSize = true, Dock = DockStyle.Left});
+			btn.Click += delegate { conemu.RunningSession?.SendControlCAsync(); };
+
 			CheckBox checkStatusBar;
 			stack.Controls.Add(checkStatusBar = new CheckBox() {Text = "StatusBar", Checked = conemu.IsStatusbarVisible});
 			checkStatusBar.CheckedChanged += delegate { conemu.IsStatusbarVisible = checkStatusBar.Checked; };
