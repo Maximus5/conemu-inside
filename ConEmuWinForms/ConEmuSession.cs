@@ -595,10 +595,10 @@ namespace ConEmu.WinForms
 		private EventHandler _evtCleanupOnExit;
 
 		[NotNull]
-		private readonly TaskCompletionSource<Missing> _taskConsoleEmulatorExit = new TaskCompletionSource<Missing>(TaskCreationOptions.LongRunning);
+		private readonly TaskCompletionSource<Missing> _taskConsoleEmulatorExit = new TaskCompletionSource<Missing>();
 
 		[NotNull]
-		private readonly TaskCompletionSource<ProcessExitedEventArgs> _taskConsolePayloadExit = new TaskCompletionSource<ProcessExitedEventArgs>(TaskCreationOptions.LongRunning);
+		private readonly TaskCompletionSource<ProcessExitedEventArgs> _taskConsolePayloadExit = new TaskCompletionSource<ProcessExitedEventArgs>();
 
 		/// <summary>
 		/// Kills the whole console emulator process if it is running. This also terminates the console emulator window.	// TODO: kill payload process only when we know its pid
