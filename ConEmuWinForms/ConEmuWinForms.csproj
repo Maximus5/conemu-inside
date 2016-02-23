@@ -54,6 +54,7 @@
     <Compile Include="ConEmuLogic.cs" />
     <Compile Include="ConEmuSession.cs" />
     <Compile Include="ConEmuStartInfo.cs" />
+    <Compile Include="GetInfoRoot.cs" />
     <Compile Include="GuiMacroExecutor.cs" />
     <Compile Include="GuiMacroBuilder.cs" />
     <Compile Include="GuiMacroResult.cs" />
