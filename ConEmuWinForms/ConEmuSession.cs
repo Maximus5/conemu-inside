@@ -665,7 +665,7 @@ namespace ConEmu.WinForms
 		/// Waits for the payload console command to exit within the terminal, or completes immediately if it has already exited. If not <see cref="WhenPayloadProcessExits.CloseTerminal" />, the terminal stays, otherwise it closes also.
 		/// </summary>
 		[NotNull]
-		public Task WaitForConsolePayloadExitAsync()
+		public Task<ProcessExitedEventArgs> WaitForConsolePayloadExitAsync()
 		{
 			return _taskConsolePayloadExit.Task;
 		}
