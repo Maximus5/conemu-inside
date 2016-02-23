@@ -67,7 +67,8 @@ namespace ConEmuInside
 				DialogResult result = MessageBox.Show(this, "Keep terminal when payload exits?", "Choice", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
 				if(result == DialogResult.Cancel)
 					return;
-				conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "choice", IsEchoingConsoleCommandLine = true, WhenPayloadProcessExits = result == DialogResult.Yes ? WhenPayloadProcessExits.KeepTerminalAndShowMessage : WhenPayloadProcessExits.CloseTerminal, PayloadExitedEventSink = (sender, args) => MessageBox.Show(this, $"Your choice is {args.ExitCode}.", "Choice", MessageBoxButtons.OK, MessageBoxIcon.Information)});
+				ConEmuSession session = conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "choice", IsEchoingConsoleCommandLine = true, WhenPayloadProcessExits = result == DialogResult.Yes ? WhenPayloadProcessExits.KeepTerminalAndShowMessage : WhenPayloadProcessExits.CloseTerminal, PayloadExitedEventSink = (sender, args) => MessageBox.Show($"Your choice is {args.ExitCode} (powered by startinfo event sink).")});
+				session.WaitForConsolePayloadExitAsync().ContinueWith(task => MessageBox.Show($"Your choice is {task.Result.ExitCode} (powered by wait-for-exit-async)."));
 			};
 		}
 	}
