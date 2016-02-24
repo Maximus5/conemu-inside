@@ -65,7 +65,13 @@
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
     <Compile Include="States.cs" />
+    <Compile Include="Util\AsyncTaskMethodBuilder!1.cs" />
+    <Compile Include="Util\IAsyncStateMachine.cs" />
+    <Compile Include="Util\ICriticalNotifyCompletion.cs" />
+    <Compile Include="Util\TaskAwaiter!1.cs" />
     <Compile Include="Util\CommandLineBuilder.cs" />
+    <Compile Include="Util\INotifyCompletion.cs" />
+    <Compile Include="Util\TaskAwaiter.cs" />
     <Compile Include="Util\TaskHelpers.cs" />
     <Compile Include="Util\WinApi.cs" />
     <Compile Include="WhenPayloadProcessExits.cs" />
