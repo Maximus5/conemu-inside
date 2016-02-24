@@ -108,7 +108,6 @@ namespace ConEmu.WinForms
 							_isPayloadExited = true;
 
 							// We haven't caught the exit of the payload process, so we haven't gotten a message with its errorlevel as well. Assume ConEmu propagates its exit code, as there ain't other way for getting it now
-							// TODO: check that this assumption holds
 							_nPayloadExitCode = _process.ExitCode;
 
 							_ansilog?.Dispose(); // Just to make sure it's been pumped out (should have been by evtCleanupOnExit)
