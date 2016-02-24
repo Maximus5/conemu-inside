@@ -79,18 +79,7 @@ namespace ConEmu.WinForms
 
 			// Should feed ANSI log?
 			if(startinfo.IsReadingAnsiStream)
-			{
-				_ansilog = new AnsiLog(_dirLocalTempRoot);
-				if(startinfo.AnsiStreamChunkReceivedEventSink != null)
-					_ansilog.AnsiStreamChunkReceived += startinfo.AnsiStreamChunkReceivedEventSink;
-
-				// Do the pumping periodically (TODO: take this to async?.. but would like to keep the final evt on the home thread, unless we go to tasks)
-				// TODO: if ConEmu writes to a pipe, we might be getting events when more data comes to the pipe rather than poll it by timer
-				_evtPolling += delegate { _ansilog.PumpStream(); };
-
-				// Final
-				_evtCleanupOnExit += delegate { _ansilog.Dispose(); };
-			}
+				_ansilog = Init_AnsiLog(startinfo);
 
 			// Cmdline
 			CommandLineBuilder cmdl = Init_MakeConEmuCommandLine(startinfo, hostcontext, _ansilog, _dirLocalTempRoot);
@@ -150,21 +139,6 @@ namespace ConEmu.WinForms
 			// Monitor payload process
 			Init_PayloadProcessMonitoring();
 
-			///////////////////////////////
-			// Set up the polling event
-			// NOTE: for now, this will be a polling timer, consider free-threaded treatment later on
-			var timer = new Timer() {Interval = (int)TimeSpan.FromSeconds(.1).TotalMilliseconds, Enabled = true};
-			timer.Tick += delegate
-			{
-				_evtPolling?.Invoke(this, EventArgs.Empty);
-				if(_process.HasExited)
-				{
-					_evtPolling = null; // Timer might fire a few more fake events on disposal
-					timer.Dispose();
-				}
-			};
-			_evtCleanupOnExit += delegate { timer.Dispose(); };
-
 			// Schedule cleanup of temp files
 			_evtCleanupOnExit += delegate
 			{
@@ -178,6 +152,23 @@ namespace ConEmu.WinForms
 					// Not interested
 				}
 			};
+		}
+
+		[NotNull]
+		private AnsiLog Init_AnsiLog([NotNull] ConEmuStartInfo startinfo)
+		{
+			var ansilog = new AnsiLog(_dirLocalTempRoot);
+			_evtCleanupOnExit += delegate { ansilog.Dispose(); };
+			if(startinfo.AnsiStreamChunkReceivedEventSink != null)
+				ansilog.AnsiStreamChunkReceived += startinfo.AnsiStreamChunkReceivedEventSink;
+
+			// Do the pumping periodically (TODO: take this to async?.. but would like to keep the final evt on the home thread, unless we go to tasks)
+			// TODO: if ConEmu writes to a pipe, we might be getting events when more data comes to the pipe rather than poll it by timer
+			var timer = new Timer() {Interval = (int)TimeSpan.FromSeconds(.1).TotalMilliseconds, Enabled = true};
+			timer.Tick += delegate { ansilog.PumpStream(); };
+			_evtCleanupOnExit += delegate { timer.Dispose(); };
+
+			return ansilog;
 		}
 
 		/// <summary>
@@ -553,14 +544,9 @@ namespace ConEmu.WinForms
 		private readonly AnsiLog _ansilog;
 
 		/// <summary>
-		/// Fires periodically while we're alive, allows to wire individual features.
-		/// </summary>
-		private EventHandler _evtPolling;
-
-		/// <summary>
 		/// Fires when we're done with, allows to wire individual features.
 		/// </summary>
-		private readonly EventHandler _evtCleanupOnExit;
+		private EventHandler _evtCleanupOnExit;
 
 		[NotNull]
 		private readonly TaskCompletionSource<Missing> _taskConsoleEmulatorExit = new TaskCompletionSource<Missing>();
