@@ -1,10 +1,21 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+
+using JetBrains.Annotations;
+
+using Microsoft.Win32.SafeHandles;
 
 namespace ConEmu.WinForms.Util
 {
+	[SuppressMessage("ReSharper", "BuiltInTypeReferenceStyle")]
 	internal static unsafe class WinApi
 	{
+		public static readonly uint SYNCHRONIZE = 1048576;
+
 		/// <summary>
 		/// The EnumChildWindows function enumerates the child windows that belong to the specified parent window by passing the handle to each child window, in turn, to an application-defined callback function. EnumChildWindows continues until the last child window is enumerated or the callback function returns FALSE.
 		/// </summary>
@@ -25,6 +36,14 @@ namespace ConEmu.WinForms.Util
 		[DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
 		public static extern void* LoadLibrary(string libname);
 
+		/// <summary>Opens an existing local process object.</summary>
+		/// <param name="dwDesiredAccess">The access to the process object.</param>
+		/// <param name="bInheritHandle">If this value is TRUE, processes created by this process will inherit the handle.</param>
+		/// <param name="dwProcessId">The identifier of the local process to be opened. If the specified process is the System Process (0x00000000), the function fails and the last error code is ERROR_INVALID_PARAMETER. If the specified process is the Idle process or one of the CSRSS processes, this function fails and the last error code is ERROR_ACCESS_DENIED because their access restrictions prevent user-level code from opening them.</param>
+		/// <returns>If the function succeeds, the return value is an open handle to the specified process. If the function fails, the return value is NULL. To get extended error information, call GetLastError.</returns>
+		[DllImport("kernel32.dll", CharSet = CharSet.Unicode, PreserveSig = true, SetLastError = true, ExactSpelling = true)]
+		public static extern void* OpenProcess(UInt32 dwDesiredAccess, Int32 bInheritHandle, UInt32 dwProcessId);
+
 		/// <summary>
 		/// The SetFocus function sets the keyboard focus to the specified window. The window must be attached to the calling thread's message queue. The SetFocus function sends a WM_KILLFOCUS message to the window that loses the keyboard focus and a WM_SETFOCUS message to the window that receives the keyboard focus. It also activates either the window that receives the focus or the parent of the window that receives the focus. If a window is active but does not have the focus, any key pressed will produce the WM_SYSCHAR, WM_SYSKEYDOWN, or WM_SYSKEYUP message. If the VK_MENU key is also pressed, the lParam parameter of the message will have bit 30 set. Otherwise, the messages produced do not have this bit set. By using the AttachThreadInput function, a thread can attach its input processing to another thread. This allows a thread to call SetFocus to set the keyboard focus to a window attached to another thread's message queue.
 		/// </summary>
@@ -41,5 +60,39 @@ namespace ConEmu.WinForms.Util
 		/// <returns>To continue enumeration, the callback function must return TRUE; to stop enumeration, it must return FALSE.</returns>
 		/// <remarks>An application must register this callback function by passing its address to EnumWindows or EnumDesktopWindows. </remarks>
 		public delegate Int32 EnumWindowsProc(void* hwnd, IntPtr lParam);
+
+		public static class Helpers
+		{
+			[NotNull]
+			public static Task<bool> WaitForProcessExitAsync(uint pid)
+			{
+				void* hProcess = OpenProcess(SYNCHRONIZE, 0, pid);
+				if(hProcess == null)
+					return TaskHelpers.FromResult(false);
+
+				var tasker = new TaskCompletionSource<bool>();
+
+				var hProcessSafe = new NativeWaitHandle(hProcess, true);
+				RegisteredWaitHandle registered = null;
+				WaitOrTimerCallback λHappened = (state, timeout) =>
+				{
+					hProcessSafe.Close();
+#pragma warning disable once AccessToModifiedClosure
+					registered?.Unregister(null);
+					tasker.SetResult(true);
+				};
+				registered = ThreadPool.RegisterWaitForSingleObject(hProcessSafe, λHappened, Missing.Value, TimeSpan.MaxValue, true);
+
+				return tasker.Task;
+			}
+		}
+
+		public class NativeWaitHandle : WaitHandle
+		{
+			public NativeWaitHandle(void* handle, bool isOwning)
+			{
+				SafeWaitHandle = new SafeWaitHandle((IntPtr)handle, isOwning);
+			}
+		}
 	}
 }
