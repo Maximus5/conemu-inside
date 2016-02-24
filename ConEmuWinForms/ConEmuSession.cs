@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -29,7 +28,7 @@ namespace ConEmu.WinForms
 	///     <para>A single session of the console emulator run. Each top-level command execution in the control spawns a new terminal and a new session.</para>
 	///     <para>After the terminal closes, the session is done with. The console payload process might exit before that point.</para>
 	/// </summary>
-	public unsafe class ConEmuSession
+	public class ConEmuSession
 	{
 		private static readonly bool IsExecutingGuiMacrosInProcess = true;
 
@@ -186,111 +185,69 @@ namespace ConEmu.WinForms
 		/// </summary>
 		private void Init_PayloadProcessMonitoring()
 		{
-			// Detect when payload process exits
-			Process processRoot = null; // After we know the root payload process PID, we'd wait for it to exit
-			_evtCleanupOnExit += delegate
+			// When the payload process exits, use its exit code
+			Action<Task<int?>> λExited = task =>
 			{
-				if(processRoot != null)
-				{
-					processRoot.Close();
-					processRoot = null;
-				}
+				if(!task.Result.HasValue) // Means the wait were aborted, e.g. ConEmu has been shut down and we processed that on the main thread
+					return;
+
+				// Make sure the whole ANSI log contents is pumped out before we notify user
+				// Dispose call pumps all out and makes sure we never ever fire anything on it after we notify user of PayloadExited; multiple calls to Dispose are OK
+				_ansilog?.Dispose();
+
+				// Fetch exit code
+				_nPayloadExitCode = task.Result.Value;
+				_isPayloadExited = true;
+
+				// Notify user
+				PayloadExited?.Invoke(this, new ProcessExitedEventArgs(_nPayloadExitCode));
 			};
-			_evtPolling += delegate
+
+			// Detect when this happens
+			Init_PayloadProcessMonitoring_WaitForExitCodeAsync().ContinueWith(λExited, TaskScheduler.FromCurrentSynchronizationContext() /* to the main thread*/);
+		}
+
+		private async Task<int?> Init_PayloadProcessMonitoring_WaitForExitCodeAsync()
+		{
+			// Async-loop retries for getting the root payload process to await its exit
+			for(;;)
 			{
+				// Might have been terminated on the main thread
 				if(_isPayloadExited)
-					return;
+					return null;
 				if(_process.HasExited)
-					return;
+					return null;
 
-				// Know root already?
-				if(processRoot != null)
+				try
 				{
-					if(!processRoot.HasExited)
-						return; // We know the root, and it has not exited yet. No use in re-asking anything.
+					// Ask ConEmu for PID
+					GetInfoRoot rootinfo = await GetInfoRoot.QueryAsync(this);
 
-					processRoot.Close();
-					processRoot = null; // Has exited => force a re-ask, we'd get its exit code from there
-				}
+					// Check if the process has extied, then we're done
+					if(rootinfo.ExitCode.HasValue)
+						return rootinfo.ExitCode.Value;
 
-				// Query on the root process
-				if(processRoot == null)
-				{
-					try
+					// If it has started already, must get a PID
+					// Await till the process exits and loop to reask conemu for its result
+					// If conemu exits too in this time, then it will republish payload exit code as its own exit code, and implementation will use it
+					if(rootinfo.Pid.HasValue)
 					{
-						// Get info on the root payload process
-						GuiMacroResult result = BeginGuiMacro("GetInfo").WithParam("Root").ExecuteSync();
-
-						if(!result.IsSuccessful) // E.g. ConEmu has not fully started yet, and ConEmuC failed to connect to the instance — would usually return an error on the first call
-							return;
-						if(string.IsNullOrEmpty(result.Response)) // Might yield an empty string randomly if not ready yet
-							return;
-
-						// Interpret the string as XML
-						var xmlDoc = new XmlDocument();
-						try
-						{
-							xmlDoc.LoadXml(result.Response);
-						}
-						catch(Exception)
-						{
-							// Could not parse the XML response. Not expected. Wait more.
-							return;
-						}
-						XmlElement xmlRoot = xmlDoc.DocumentElement;
-						if(xmlRoot == null)
-							return;
-
-						// Current possible records:
-						// <Root Name="cmd.exe" />
-						// <Root Name="cmd.exe" Running="true" PID="22088" ExitCode="259" UpTime="688343" />
-						// <Root Name="cmd.exe" Running="false" PID="22088" ExitCode="0" UpTime="688343" />
-						// Interested of the latter two only
-
-						bool isRunning;
-						if(!bool.TryParse(xmlRoot.GetAttribute("Running"), out isRunning))
-							return; // Might mean the process hasn't started yet, in which case we get an empty attr and can't parse it
-
-						if(isRunning)
-						{
-							// Monitor a running process
-							try
-							{
-								int nPid = int.Parse(xmlRoot.GetAttribute("PID"));
-								processRoot = Process.GetProcessById(nPid);
-								// TODO: Might sink its Exited event (when we got Tasks here e.g.), but for now it's simpler to reuse the same polling timer
-							}
-							catch(Exception)
-							{
-								// Couldn't get hold of the process, wait to retry
-							}
-						}
-						else // Means done running the payload process in ConEmu, all done
-						{
-							// Make sure the whole ANSI log contents is pumped out before we notify user
-							// Dispose call pumps all out and makes sure we never ever fire anything on it after we notify user of PayloadExited; multiple calls to Dispose are OK
-							_ansilog?.Dispose();
-
-							// Fetch exit code
-							int nExitCode;
-							if(int.TryParse(xmlRoot.GetAttribute("ExitCode"), NumberStyles.Integer, NumberFormatInfo.InvariantInfo, out nExitCode))
-								_nPayloadExitCode = nExitCode;
-							_isPayloadExited = true;
-
-							// Notify user
-							PayloadExited?.Invoke(this, new ProcessExitedEventArgs(_nPayloadExitCode));
-						}
-					}
-					catch
-					{
-						// Don't want to break the whole process, and got no exception reporter here => skip nonfatal errors, assume it's a temporary problem, ask next time
+						await WinApi.Helpers.WaitForProcessExitAsync(rootinfo.Pid.Value);
+						continue; // Do not wait before retrying
 					}
 				}
-			};
+				catch(Exception)
+				{
+					// Smth failed, wait and retry
+				}
+
+				// Await before retrying once more
+				await TaskHelpers.Delay(TimeSpan.FromMilliseconds(10));
+			}
 		}
 
 		[NotNull]
-		private static CommandLineBuilder Init_MakeConEmuCommandLine([NotNull] ConEmuStartInfo startinfo, [NotNull] HostContext hostcontext, [CanBeNull] AnsiLog ansilog, [NotNull] DirectoryInfo dirLocalTempRoot)
+		private static unsafe CommandLineBuilder Init_MakeConEmuCommandLine([NotNull] ConEmuStartInfo startinfo, [NotNull] HostContext hostcontext, [CanBeNull] AnsiLog ansilog, [NotNull] DirectoryInfo dirLocalTempRoot)
 		{
 			if(startinfo == null)
 				throw new ArgumentNullException(nameof(startinfo));
@@ -603,7 +560,7 @@ namespace ConEmu.WinForms
 		/// <summary>
 		/// Fires when we're done with, allows to wire individual features.
 		/// </summary>
-		private EventHandler _evtCleanupOnExit;
+		private readonly EventHandler _evtCleanupOnExit;
 
 		[NotNull]
 		private readonly TaskCompletionSource<Missing> _taskConsoleEmulatorExit = new TaskCompletionSource<Missing>();
@@ -646,7 +603,7 @@ namespace ConEmu.WinForms
 							return false;
 						try
 						{
-							Process.GetProcessById(task.Result.Pid.Value).Kill();
+							Process.GetProcessById((int)task.Result.Pid.Value).Kill();
 						}
 						catch(Exception)
 						{
@@ -666,8 +623,8 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		/// <para>Sends the Control+C signal to the payload console process, which will most likely abort it.</para>
-		/// <para>Unlike <see cref="KillConsolePayloadProcessAsync"/>, this is a soft signal which might be processed by the console process for a graceful shutdown, or ignored altogether.</para>
+		///     <para>Sends the Control+C signal to the payload console process, which will most likely abort it.</para>
+		///     <para>Unlike <see cref="KillConsolePayloadProcessAsync" />, this is a soft signal which might be processed by the console process for a graceful shutdown, or ignored altogether.</para>
 		/// </summary>
 		public Task SendControlCAsync()
 		{
@@ -684,8 +641,8 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		/// <para>Sends the Control+Break signal to the payload console process, which will most likely abort it.</para>
-		/// <para>Unlike <see cref="KillConsolePayloadProcessAsync"/>, this is a soft signal which might be processed by the console process for a graceful shutdown, or ignored altogether.</para>
+		///     <para>Sends the Control+Break signal to the payload console process, which will most likely abort it.</para>
+		///     <para>Unlike <see cref="KillConsolePayloadProcessAsync" />, this is a soft signal which might be processed by the console process for a graceful shutdown, or ignored altogether.</para>
 		/// </summary>
 		public Task SendControlBreakAsync()
 		{
@@ -755,7 +712,7 @@ namespace ConEmu.WinForms
 			return _taskConsolePayloadExit.Task;
 		}
 
-		public class HostContext
+		public unsafe class HostContext
 		{
 			public HostContext([NotNull] void* hWndParent, bool isStatusbarVisibleInitial)
 			{
