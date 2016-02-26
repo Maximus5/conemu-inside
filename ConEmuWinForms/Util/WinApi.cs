@@ -36,6 +36,19 @@ namespace ConEmu.WinForms.Util
 		[DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
 		public static extern void* LoadLibrary(string libname);
 
+		/// <summary>
+		/// The MoveWindow function changes the position and dimensions of the specified window. For a top-level window, the position and dimensions are relative to the upper-left corner of the screen. For a child window, they are relative to the upper-left corner of the parent window's client area.
+		/// </summary>
+		/// <param name="hWnd">[in] Handle to the window. </param>
+		/// <param name="X">[in] Specifies the new position of the left side of the window. </param>
+		/// <param name="Y">[in] Specifies the new position of the top of the window. </param>
+		/// <param name="nWidth">[in] Specifies the new width of the window. </param>
+		/// <param name="nHeight">[in] Specifies the new height of the window. </param>
+		/// <param name="bRepaint">[in] Specifies whether the window is to be repainted. If this parameter is TRUE, the window receives a message. If the parameter is FALSE, no repainting of any kind occurs. This applies to the client area, the nonclient area (including the title bar and scroll bars), and any part of the parent window uncovered as a result of moving a child window. </param>
+		/// <returns>If the function succeeds, the return value is nonzero. If the function fails, the return value is zero. To get extended error information, call GetLastError.</returns>
+		[DllImport("User32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+		public static extern int MoveWindow(void* hWnd, int X, int Y, int nWidth, int nHeight, int bRepaint);
+
 		/// <summary>Opens an existing local process object.</summary>
 		/// <param name="dwDesiredAccess">The access to the process object.</param>
 		/// <param name="bInheritHandle">If this value is TRUE, processes created by this process will inherit the handle.</param>
