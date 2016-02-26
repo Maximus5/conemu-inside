@@ -187,6 +187,14 @@ namespace ConEmu.WinForms
 				WinApi.SetFocus(hwnd);
 		}
 
+		protected override void OnLayout(LayoutEventArgs levent)
+		{
+			base.OnLayout(levent);
+			void* hwnd = TryGetConEmuHwnd();
+			if(hwnd != null)
+				WinApi.MoveWindow(hwnd, 0, 0, ClientSize.Width, ClientSize.Height, 1);
+		}
+
 		protected override void OnHandleCreated(EventArgs e)
 		{
 			if(AutoStartInfo != null)
