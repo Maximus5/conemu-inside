@@ -92,8 +92,8 @@ namespace ConEmu.WinForms
 				// Special case for just-exited payload: user might get the payload-exited event before us and call this property to get its exit code, while we have not recorded the fresh exit code yet
 				// So call into the current session and fetch the actual value, if available (no need to write to field, will update in our event handler soon)
 				ConEmuSession running = _running;
-				if((running != null) && (running.IsPayloadExited))
-					return running.GetPayloadExitCode();
+				if((running != null) && (running.IsConsoleProcessExited))
+					return running.GetConsoleProcessExitCode();
 				return _isEverRun ? _nLastExitCode : default(int?); // No terminal open or current process still running in the terminal, use prev exit code if there were
 			}
 		}
@@ -110,7 +110,7 @@ namespace ConEmu.WinForms
 		///     <para>Gets the current state of the control regarding what's running in it.</para>
 		///     <para>This only changes on the main thread.</para>
 		/// </summary>
-		public States TerminalState => _running != null ? (_running.IsPayloadExited ? States.DetachedTerminal : States.TerminalWithConsoleProcess) : (_isEverRun ? States.Exited : States.Empty);
+		public States TerminalState => _running != null ? (_running.IsConsoleProcessExited ? States.DetachedTerminal : States.TerminalWithConsoleProcess) : (_isEverRun ? States.Exited : States.Empty);
 
 		/// <summary>
 		/// Gets whether there is an open terminal displayed in the control. Of <see cref="TerminalState" />, that's either <see cref="States.TerminalWithConsoleProcess" /> or <see cref="States.DetachedTerminal" />.
@@ -140,7 +140,7 @@ namespace ConEmu.WinForms
 			{
 				try
 				{
-					_nLastExitCode = _running.GetPayloadExitCode();
+					_nLastExitCode = _running.GetConsoleProcessExitCode();
 				}
 				catch(Exception)
 				{

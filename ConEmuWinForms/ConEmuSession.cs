@@ -25,26 +25,33 @@ using Timer = System.Windows.Forms.Timer;
 namespace ConEmu.WinForms
 {
 	/// <summary>
-	///     <para>A single session of the console emulator run. Each top-level command execution in the control spawns a new terminal and a new session.</para>
-	///     <para>After the terminal closes, the session is done with. The console payload process might exit before that point.</para>
+	///     <para>A single session of the console emulator running a console process. Each console process execution in the control spawns a new console emulator and a new session.</para>
+	/// <para>When the console emulator starts, a console view appears in the control. The console process starts running in it immediately. When the console process terminates, the console emulator might or might not be closed, depending on the settings. After the console emulator closes, the control stops viewing the console, and this session ends.</para>
 	/// </summary>
 	public class ConEmuSession
 	{
+		/// <summary>
+		/// A service option. Whether to load the ConEmu helper DLL in-process to communicate with ConEmu (<c>True</c>, new mode), or start a new helper process to send each command (<c>False</c>, legacy mode).
+		/// </summary>
 		private static readonly bool IsExecutingGuiMacrosInProcess = true;
 
 		/// <summary>
-		/// Non-NULL if we've requested ANSI log from ConEmu and are listening for it.
+		/// Non-NULL if we've requested ANSI log from ConEmu and are listening to it.
 		/// </summary>
 		[CanBeNull]
 		private readonly AnsiLog _ansilog;
 
+		/// <summary>
+		/// Per-session temp files, like the startup options for ConEmu and ANSI log cache.
+		/// </summary>
 		[NotNull]
 		private readonly DirectoryInfo _dirTempWorkingFolder;
 
+		/// <summary>
+		/// Sends commands to the ConEmu instance and gets info from it.
+		/// </summary>
 		[NotNull]
 		private readonly GuiMacroExecutor _guiMacroExecutor;
-
-		private bool _isPayloadExited;
 
 		/// <summary>
 		/// Executed to process disposal.
@@ -53,9 +60,9 @@ namespace ConEmu.WinForms
 		private readonly List<Action> _lifetime = new List<Action>();
 
 		/// <summary>
-		/// The exit code of the payload process, if it has already exited (<see cref="_isPayloadExited" />). Otherwise, undefined behavior.
+		/// The exit code of the console process, if it has already exited. <c>Null</c>, if the console process is still running within the console emulator.
 		/// </summary>
-		private int _nPayloadExitCode;
+		private int? _nConsoleProcessExitCode2;
 
 		/// <summary>
 		/// The ConEmu process, even after it exits.
@@ -63,16 +70,29 @@ namespace ConEmu.WinForms
 		[NotNull]
 		private readonly Process _process;
 
+		/// <summary>
+		/// Stores the main thread scheduler, so that all state properties were only changed on this thread.
+		/// </summary>
+		[NotNull]
 		private readonly TaskScheduler _schedulerSta = TaskScheduler.FromCurrentSynchronizationContext();
 
+		/// <summary>
+		/// The original parameters for this session; sealed, so they can't change after the session is run.
+		/// </summary>
 		[NotNull]
 		private readonly ConEmuStartInfo _startinfo;
 
+		/// <summary>
+		/// Task-based notification of the console emulator closing.
+		/// </summary>
 		[NotNull]
-		private readonly TaskCompletionSource<Missing> _taskConsoleEmulatorExit = new TaskCompletionSource<Missing>();
+		private readonly TaskCompletionSource<Missing> _taskConsoleEmulatorClosed = new TaskCompletionSource<Missing>();
 
+		/// <summary>
+		/// Task-based notification of the console process exiting.
+		/// </summary>
 		[NotNull]
-		private readonly TaskCompletionSource<ProcessExitedEventArgs> _taskConsolePayloadExit = new TaskCompletionSource<ProcessExitedEventArgs>();
+		private readonly TaskCompletionSource<ProcessExitedEventArgs> _taskConsoleProcessExit = new TaskCompletionSource<ProcessExitedEventArgs>();
 
 		public ConEmuSession([NotNull] ConEmuStartInfo startinfo, [NotNull] HostContext hostcontext)
 		{
@@ -112,9 +132,10 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		/// Gets whether the payload process has already exited (see <see cref="PayloadExited" />). The console emulator process might have exited as well, but might have not.
+		/// <para>Gets whether the console process has already exited (see <see cref="PayloadExited" />). The console emulator view might have closed as well, but might have not (see <see cref="ConEmuStartInfo.WhenPayloadProcessExits"/>).</para>
+		/// <para>This state only changes on the main thread.</para>
 		/// </summary>
-		public bool IsPayloadExited => _isPayloadExited;
+		public bool IsConsoleProcessExited => _nConsoleProcessExitCode2.HasValue;
 
 		/// <summary>
 		/// Gets the start info with which this session has been started.
@@ -184,13 +205,15 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		/// Gets the exit code of the payload process, if <see cref="IsPayloadExited">it has already exited</see>. Throws an exception if it has not.
+		/// <para>Gets the exit code of the console process, if <see cref="IsConsoleProcessExited">it has already exited</see>. Throws an exception if it has not.</para>
+		/// <para>This state only changes on the main thread.</para>
 		/// </summary>
-		public int GetPayloadExitCode()
+		public int GetConsoleProcessExitCode()
 		{
-			if(!_isPayloadExited)
-				throw new InvalidOperationException("The exit code is not available yet because the process has not yet exited.");
-			return _nPayloadExitCode;
+			int? nCode = _nConsoleProcessExitCode2;
+			if(!nCode.HasValue)
+				throw new InvalidOperationException("The exit code is not available yet because the console process is still running.");
+			return nCode.Value;
 		}
 
 		/// <summary>
@@ -218,7 +241,7 @@ namespace ConEmu.WinForms
 		{
 			try
 			{
-				if((!_process.HasExited) && (!_isPayloadExited))
+				if((!_process.HasExited) && (!_nConsoleProcessExitCode2.HasValue))
 				{
 					return GetInfoRoot.QueryAsync(this).ContinueWith(task =>
 					{
@@ -289,7 +312,7 @@ namespace ConEmu.WinForms
 		[NotNull]
 		public Task WaitForConsoleEmulatorExitAsync()
 		{
-			return _taskConsoleEmulatorExit.Task;
+			return _taskConsoleEmulatorClosed.Task;
 		}
 
 		/// <summary>
@@ -298,7 +321,7 @@ namespace ConEmu.WinForms
 		[NotNull]
 		public Task<ProcessExitedEventArgs> WaitForConsolePayloadExitAsync()
 		{
-			return _taskConsolePayloadExit.Task;
+			return _taskConsoleProcessExit.Task;
 		}
 
 		/// <summary>
@@ -586,7 +609,7 @@ namespace ConEmu.WinForms
 			for(;;)
 			{
 				// Might have been terminated on the main thread
-				if(_isPayloadExited)
+				if(_nConsoleProcessExitCode2.HasValue)
 					return null;
 				if(_process.HasExited)
 					return null;
@@ -698,8 +721,8 @@ namespace ConEmu.WinForms
 
 			// Re-issue events as async tasks
 			// As we advise events before they even fire, the task is guaranteed to get its state
-			PayloadExited += (sender, args) => _taskConsolePayloadExit.SetResult(args);
-			ConsoleEmulatorExited += delegate { _taskConsoleEmulatorExit.SetResult(Missing.Value); };
+			PayloadExited += (sender, args) => _taskConsoleProcessExit.SetResult(args);
+			ConsoleEmulatorExited += delegate { _taskConsoleEmulatorClosed.SetResult(Missing.Value); };
 		}
 
 		/// <summary>
@@ -724,19 +747,18 @@ namespace ConEmu.WinForms
 		/// <param name="nPayloadExitCode"></param>
 		private void TryFirePayloadExited(int nPayloadExitCode)
 		{
-			if(_isPayloadExited) // It's OK to call it from multiple places, e.g. when payload exit were detected and when ConEmu process itself exits
+			if(_nConsoleProcessExitCode2.HasValue) // It's OK to call it from multiple places, e.g. when payload exit were detected and when ConEmu process itself exits
 				return;
-			_isPayloadExited = true;
 
 			// Make sure the whole ANSI log contents is pumped out before we notify user
 			// Dispose call pumps all out and makes sure we never ever fire anything on it after we notify user of PayloadExited; multiple calls to Dispose are OK
 			_ansilog?.Dispose();
 
 			// Store exit code
-			_nPayloadExitCode = nPayloadExitCode;
+			_nConsoleProcessExitCode2 = nPayloadExitCode;
 
 			// Notify user
-			PayloadExited?.Invoke(this, new ProcessExitedEventArgs(_nPayloadExitCode));
+			PayloadExited?.Invoke(this, new ProcessExitedEventArgs(nPayloadExitCode));
 		}
 
 		public unsafe class HostContext
