@@ -19,7 +19,7 @@ namespace ConEmu.WinForms
 
 		/// <summary>
 		///     <para>The terminal is still open, but the payload console process in it has already exited.</para>
-		///     <para>The terminal stays open in this case if <see cref="ConEmuStartInfo.WhenPayloadProcessExits" /> allows it.</para>
+		///     <para>The terminal stays open in this case if <see cref="ConEmuStartInfo.WhenConsoleProcessExits" /> allows it.</para>
 		///     <para><see cref="ConEmuControl.RunningSession" /> is available.</para>
 		/// </summary>
 		DetachedTerminal,

@@ -17,7 +17,7 @@ namespace ConEmu.WinForms
 		public static readonly string ConEmuSubfolderName = "ConEmu";
 
 		/// <summary>
-		/// The default for <see cref="ConEmuStartInfo.ConsoleCommandLine" />.
+		/// The default for <see cref="ConEmuStartInfo.ConsoleProcessCommandLine" />.
 		/// Runs the stock ConEmu task for the Windows command line.
 		/// </summary>
 		public static readonly string DefaultConsoleCommandLine = "{cmd}";

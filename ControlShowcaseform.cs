@@ -63,7 +63,7 @@ namespace ConEmuInside
 				}
 				if(txtOutput == null)
 					Controls.Add(txtOutput = new TextBox() {Multiline = true, Dock = DockStyle.Right, Width = 200});
-				conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "ping ya.ru", IsEchoingConsoleCommandLine = true, AnsiStreamChunkReceivedEventSink = (sender, args) => txtOutput.Text += args.GetMbcsText(), WhenPayloadProcessExits = WhenConsoleProcessExits.KeepConsoleEmulatorAndShowMessage, PayloadExitedEventSink = (sender, args) => txtOutput.Text += $"Exited with ERRORLEVEL {args.ExitCode}.", GreetingText = $"This will showcase getting the command output live in the backend.{Environment.NewLine}As the PING command runs, the textbox would duplicate its stdout in real time.{Environment.NewLine}{Environment.NewLine}"});
+				conemu.Start(new ConEmuStartInfo() {ConsoleProcessCommandLine = "ping ya.ru", IsEchoingConsoleCommandLine = true, AnsiStreamChunkReceivedEventSink = (sender, args) => txtOutput.Text += args.GetMbcsText(), WhenConsoleProcessExits = WhenConsoleProcessExits.KeepConsoleEmulatorAndShowMessage, ConsoleProcessExitedEventSink = (sender, args) => txtOutput.Text += $"Exited with ERRORLEVEL {args.ExitCode}.", GreetingText = $"This will showcase getting the command output live in the backend.{Environment.NewLine}As the PING command runs, the textbox would duplicate its stdout in real time.{Environment.NewLine}{Environment.NewLine}"});
 			};
 
 			stack.Controls.Add(btn = new Button() {Text = "&Choice", AutoSize = true, Dock = DockStyle.Left});
@@ -73,7 +73,7 @@ namespace ConEmuInside
 				DialogResult result = MessageBox.Show(this, "Keep terminal when payload exits?", "Choice", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
 				if(result == DialogResult.Cancel)
 					return;
-				ConEmuSession session = conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "choice", IsEchoingConsoleCommandLine = true, WhenPayloadProcessExits = result == DialogResult.Yes ? WhenConsoleProcessExits.KeepConsoleEmulatorAndShowMessage : WhenConsoleProcessExits.CloseConsoleEmulator, PayloadExitedEventSink = (sender, args) => MessageBox.Show($"Your choice is {args.ExitCode} (powered by startinfo event sink).")});
+				ConEmuSession session = conemu.Start(new ConEmuStartInfo() {ConsoleProcessCommandLine = "choice", IsEchoingConsoleCommandLine = true, WhenConsoleProcessExits = result == DialogResult.Yes ? WhenConsoleProcessExits.KeepConsoleEmulatorAndShowMessage : WhenConsoleProcessExits.CloseConsoleEmulator, ConsoleProcessExitedEventSink = (sender, args) => MessageBox.Show($"Your choice is {args.ExitCode} (powered by startinfo event sink).")});
 				session.WaitForConsoleProcessExitAsync().ContinueWith(task => MessageBox.Show($"Your choice is {task.Result.ExitCode} (powered by wait-for-exit-async)."));
 			};
 		}

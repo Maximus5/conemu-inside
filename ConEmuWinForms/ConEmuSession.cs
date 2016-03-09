@@ -106,8 +106,8 @@ namespace ConEmu.WinForms
 				throw new ArgumentNullException(nameof(startinfo));
 			if(hostcontext == null)
 				throw new ArgumentNullException(nameof(hostcontext));
-			if(string.IsNullOrEmpty(startinfo.ConsoleCommandLine))
-				throw new InvalidOperationException($"Cannot start a new console process for command line “{startinfo.ConsoleCommandLine}” because it's either NULL, or empty, or whitespace.");
+			if(string.IsNullOrEmpty(startinfo.ConsoleProcessCommandLine))
+				throw new InvalidOperationException($"Cannot start a new console process for command line “{startinfo.ConsoleProcessCommandLine}” because it's either NULL, or empty, or whitespace.");
 
 			_startinfo = startinfo;
 			startinfo.MarkAsUsedUp(); // No more changes allowed in this copy
@@ -138,7 +138,7 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		///     <para>Gets whether the console process has already exited (see <see cref="ConsoleProcessExited" />). The console emulator view might have closed as well, but might have not (see <see cref="ConEmuStartInfo.WhenPayloadProcessExits" />).</para>
+		///     <para>Gets whether the console process has already exited (see <see cref="ConsoleProcessExited" />). The console emulator view might have closed as well, but might have not (see <see cref="ConEmuStartInfo.WhenConsoleProcessExits" />).</para>
 		///     <para>This state only changes on the main thread.</para>
 		/// </summary>
 		public bool IsConsoleProcessExited => _nConsoleProcessExitCode.HasValue;
@@ -164,7 +164,7 @@ namespace ConEmu.WinForms
 
 		/// <summary>
 		///     <para>Closes the console emulator window, and kills the console process if it's still running.</para>
-		///     <para>To just kill the console process, use <see cref="KillConsoleProcessAsync" />. If <see cref="ConEmuStartInfo.WhenPayloadProcessExits" /> allows, the console emulator window might stay open after that.</para>
+		///     <para>To just kill the console process, use <see cref="KillConsoleProcessAsync" />. If <see cref="ConEmuStartInfo.WhenConsoleProcessExits" /> allows, the console emulator window might stay open after that.</para>
 		/// </summary>
 		public void CloseConsoleEmulator()
 		{
@@ -240,7 +240,7 @@ namespace ConEmu.WinForms
 
 		/// <summary>
 		///     <para>Kills the console process running in the console emulator window, if it has not exited yet.</para>
-		///     <para>This does not necessarily kill the console emulator process which displays the console window, but it might also close if <see cref="ConEmuStartInfo.WhenPayloadProcessExits" /> says so.</para>
+		///     <para>This does not necessarily kill the console emulator process which displays the console window, but it might also close if <see cref="ConEmuStartInfo.WhenConsoleProcessExits" /> says so.</para>
 		/// </summary>
 		/// <returns>Whether the process were killed (otherwise it has been terminated due to some other reason, e.g. exited on its own or killed by a third party).</returns>
 		[NotNull]
@@ -389,7 +389,7 @@ namespace ConEmu.WinForms
 		/// <summary>
 		///     <para>Fires on the main thread when the console process running in the console emulator terminates.</para>
 		///     <para>If not <see cref="WhenConsoleProcessExits.CloseConsoleEmulator" />, the console emulator stays, otherwise it closes also, and the console emulator window is hidden from the control.</para>
-		///     <para>For short-lived processes, this event might fire before you can start sinking it. To get notified reliably, use <see cref="WaitForConsoleProcessExitAsync" /> or <see cref="ConEmuStartInfo.PayloadExitedEventSink" />.</para>
+		///     <para>For short-lived processes, this event might fire before you can start sinking it. To get notified reliably, use <see cref="WaitForConsoleProcessExitAsync" /> or <see cref="ConEmuStartInfo.ConsoleProcessExitedEventSink" />.</para>
 		///     <para>If you're reading the ANSI log with <see cref="AnsiStreamChunkReceived" />, it's guaranteed that all the events for the log will be fired before <see cref="ConsoleProcessExited" />, and there will be no events afterwards.</para>
 		/// </summary>
 		public event EventHandler<ConsoleProcessExitedEventArgs> ConsoleProcessExited;
@@ -471,7 +471,7 @@ namespace ConEmu.WinForms
 			// Console mode command
 			// NOTE: if placed AFTER the payload command line, otherwise somehow conemu hooks won't fetch the switch out of the cmdline, e.g. with some complicated git fetch/push cmdline syntax which has a lot of colons inside on itself
 			string sConsoleExitMode;
-			switch(startinfo.WhenPayloadProcessExits)
+			switch(startinfo.WhenConsoleProcessExits)
 			{
 			case WhenConsoleProcessExits.CloseConsoleEmulator:
 				sConsoleExitMode = "n";
@@ -483,12 +483,12 @@ namespace ConEmu.WinForms
 				sConsoleExitMode = "c";
 				break;
 			default:
-				throw new ArgumentOutOfRangeException("ConEmuStartInfo" + "::" + "WhenConsoleProcessExits", startinfo.WhenPayloadProcessExits, "This is not a valid enum value.");
+				throw new ArgumentOutOfRangeException("ConEmuStartInfo" + "::" + "WhenConsoleProcessExits", startinfo.WhenConsoleProcessExits, "This is not a valid enum value.");
 			}
 			cmdl.AppendSwitchIfNotNull("-cur_console:", $"{(startinfo.IsElevated ? "a" : "")}{sConsoleExitMode}");
 
 			// And the shell command line itself
-			cmdl.AppendSwitch(startinfo.ConsoleCommandLine);
+			cmdl.AppendSwitch(startinfo.ConsoleProcessCommandLine);
 
 			return cmdl;
 		}
@@ -551,7 +551,7 @@ namespace ConEmu.WinForms
 				{
 					XmlElement xmlLine;
 					xmlElem.AppendChild(xmlLine = xmldoc.CreateElement("line"));
-					xmlLine.SetAttribute("data", $"echo {Init_MakeConEmuCommandLine_EmitConfigFile_EscapeEchoText(startinfo.ConsoleCommandLine)}");
+					xmlLine.SetAttribute("data", $"echo {Init_MakeConEmuCommandLine_EmitConfigFile_EscapeEchoText(startinfo.ConsoleProcessCommandLine)}");
 				}
 			}
 
@@ -729,8 +729,8 @@ namespace ConEmu.WinForms
 				throw new ArgumentNullException(nameof(startinfo));
 
 			// Advise events before they got chance to fire, use event sinks from startinfo for guaranteed delivery
-			if(startinfo.PayloadExitedEventSink != null)
-				ConsoleProcessExited += startinfo.PayloadExitedEventSink;
+			if(startinfo.ConsoleProcessExitedEventSink != null)
+				ConsoleProcessExited += startinfo.ConsoleProcessExitedEventSink;
 			if(startinfo.ConsoleEmulatorClosedEventSink != null)
 				ConsoleEmulatorClosed += startinfo.ConsoleEmulatorClosedEventSink;
 

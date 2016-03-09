@@ -39,7 +39,7 @@ namespace ConEmu.WinForms
 		/// <summary>
 		///     <para>Gets or sets whether this control will start the console process as soon as it's loaded on the form: yes if non-<c>NULL</c>, and no if <c>NULL</c>.</para>
 		///     <para>Set this to <c>NULL</c> to prevent the terminal emulator from opening automatically. Adjust this object or assign a new one to setup the initial terminal emulator.</para>
-		///     <para>You can either specify the console executable to run in <see cref="ConEmuStartInfo.ConsoleCommandLine" /> (the console window will close as soon as it exits), or use its default value <see cref="ConEmuConstants.DefaultConsoleCommandLine" /> for the default Windows console and execute your command in that console with <see cref="ConEmuSession.WriteInputText" /> (the console will remain operable after the command completes).</para>
+		///     <para>You can either specify the console executable to run in <see cref="ConEmuStartInfo.ConsoleProcessCommandLine" /> (the console window will close as soon as it exits), or use its default value <see cref="ConEmuConstants.DefaultConsoleCommandLine" /> for the default Windows console and execute your command in that console with <see cref="ConEmuSession.WriteInputText" /> (the console will remain operable after the command completes).</para>
 		/// </summary>
 		/// <remarks>
 		///     <para>This object cannot be changed after the console emulator starts. The value of the property becomes <c>NULL</c> and cannot be changed either.</para>
