@@ -12,8 +12,9 @@ using JetBrains.Annotations;
 namespace ConEmu.WinForms
 {
 	/// <summary>
-	///     <para>The console emulator control.</para>
-	///     <para>If <see cref="AutoStartInfo" /> is non-<c>NULL</c>, immediately starts the emulator on its parameters, and shows the console emulator in the control. Otherwise (or after the process exits), shows the gray background.</para>
+	///     <para>The console emulator control with an embedded fully functional console view capable of running any console applications with complex interaction with the console.</para>
+	///     <para>As opposed to capturing standard output of a console process, this control makes the console process think that it's running in the real console, and supports all the features like interactivity or rewriting and coloring the output.</para>
+	///     <para>The control can be used to run a console process in the console emulator. The console process is the single command executed in the control, which could be a simple executable (the console emulator is not usable after it exits), or an interactive shell like <c>cmd</c> or <c>powershell</c> or <c>bash</c>, which in turn can execute multiple commands, either by user input or programmatically with <see cref="ConEmuSession.WriteInputText" />. The console emulator is what implements the console and renders the console view in the control. A new console emulator (represented by a <see cref="RunningSession" />) is <see cref="Start">started</see> for each console process. After the root console process terminates, the console emulator might remain open (see <see cref="ConEmuStartInfo.WhenConsoleProcessExits" />) and still present the console window, or get closed. After the console emulator exits, the control is blank until <see cref="Start" /> spawns a new console emulator for a console process in it. You cannot run more than one console emulator (or console process) simultaneousely.</para>
 	/// </summary>
 	public unsafe class ConEmuControl : Control
 	{
