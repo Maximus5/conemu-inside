@@ -13,7 +13,7 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		/// Gets the exit code of the process.
+		/// Gets the exit code of the console process.
 		/// </summary>
 		public int ExitCode { get; }
 	}

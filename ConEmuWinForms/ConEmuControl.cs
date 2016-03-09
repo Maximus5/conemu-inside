@@ -110,10 +110,10 @@ namespace ConEmu.WinForms
 		///     <para>Gets the current state of the control regarding what's running in it.</para>
 		///     <para>This only changes on the main thread.</para>
 		/// </summary>
-		public States TerminalState => _running != null ? (_running.IsConsoleProcessExited ? States.DetachedTerminal : States.TerminalWithConsoleProcess) : (_isEverRun ? States.Exited : States.Empty);
+		public States TerminalState => _running != null ? (_running.IsConsoleProcessExited ? States.ConsoleEmulatorEmpty : States.ConsoleEmulatorWithConsoleProcess) : (_isEverRun ? States.Recycled : States.Unused);
 
 		/// <summary>
-		/// Gets whether there is an open terminal displayed in the control. Of <see cref="TerminalState" />, that's either <see cref="States.TerminalWithConsoleProcess" /> or <see cref="States.DetachedTerminal" />.
+		/// Gets whether there is an open terminal displayed in the control. Of <see cref="TerminalState" />, that's either <see cref="States.ConsoleEmulatorWithConsoleProcess" /> or <see cref="States.ConsoleEmulatorEmpty" />.
 		/// </summary>
 		public bool IsTerminalOpen => _running != null;
 
