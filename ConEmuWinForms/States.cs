@@ -1,7 +1,7 @@
 namespace ConEmu.WinForms
 {
 	/// <summary>
-	/// <see cref="ConEmuControl"/> states.
+	/// <see cref="ConEmuControl" /> states.
 	/// </summary>
 	public enum States
 	{

@@ -8,7 +8,7 @@ namespace ConEmu.WinForms
 	/// <summary>
 	/// Manages reading the ANSI log output of the conemu and firing events with its data to the user.
 	/// </summary>
-	class AnsiLog : IDisposable
+	internal class AnsiLog : IDisposable
 	{
 		/// <summary>
 		/// When we found the ansi file.

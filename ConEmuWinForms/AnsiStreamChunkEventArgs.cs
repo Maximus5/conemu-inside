@@ -26,13 +26,7 @@ namespace ConEmu.WinForms
 		/// Gets the raw bytes of the chunk.
 		/// </summary>
 		[NotNull]
-		public byte[] Chunk
-		{
-			get
-			{
-				return _chunk;
-			}
-		}
+		public byte[] Chunk => _chunk;
 
 		/// <summary>
 		/// Assuming the stream is encoded in the current system's MBCS encoding, gets its text.
