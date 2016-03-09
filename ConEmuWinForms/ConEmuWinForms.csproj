@@ -51,7 +51,6 @@
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="AssemblyInfo.cs" />
-    <Compile Include="ConEmuLogic.cs" />
     <Compile Include="ConEmuSession.cs" />
     <Compile Include="ConEmuStartInfo.cs" />
     <Compile Include="GetInfoRoot.cs" />
