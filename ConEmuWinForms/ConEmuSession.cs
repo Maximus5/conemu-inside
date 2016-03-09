@@ -163,7 +163,16 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
+		/// An alias for <see cref="CloseConsoleEmulator" />.
+		/// </summary>
+		public void Close()
+		{
+			CloseConsoleEmulator();
+		}
+
+		/// <summary>
 		///     <para>Closes the console emulator window, and kills the console process if it's still running.</para>
+		///     <para>This also closes the running session, the control goes blank and ready for running a new session.</para>
 		///     <para>To just kill the console process, use <see cref="KillConsoleProcessAsync" />. If <see cref="ConEmuStartInfo.WhenConsoleProcessExits" /> allows, the console emulator window might stay open after that.</para>
 		/// </summary>
 		public void CloseConsoleEmulator()
