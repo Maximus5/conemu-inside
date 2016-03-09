@@ -54,9 +54,24 @@ namespace ConEmu.WinForms
 
 		private WhenConsoleProcessExits _whenConsoleProcessExits = WhenConsoleProcessExits.KeepConsoleEmulatorAndShowMessage;
 
+		/// <summary>
+		///     <para>Creates a new object with all the parameters in their default values.</para>
+		///     <para>The console emulator will run the default <c>CMD</c> shell with such an empty object.</para>
+		/// </summary>
 		public ConEmuStartInfo()
 		{
 			ConEmuExecutablePath = InitConEmuLocation();
+		}
+
+		/// <summary>
+		/// Creates a new object and defines the command line for the console process to be run in the console emulator, <see cref="ConsoleProcessCommandLine" />.
+		/// </summary>
+		/// <param name="sConsoleProcessCommandLine">Value for <see cref="ConsoleProcessCommandLine" />.</param>
+		public ConEmuStartInfo([NotNull] string sConsoleProcessCommandLine)
+			: this()
+		{
+			if(sConsoleProcessCommandLine == null)
+				throw new ArgumentNullException(nameof(sConsoleProcessCommandLine));
 		}
 
 		/// <summary>
