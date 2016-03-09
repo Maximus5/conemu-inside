@@ -74,7 +74,7 @@
     <Compile Include="Util\TaskAwaiter.cs" />
     <Compile Include="Util\TaskHelpers.cs" />
     <Compile Include="Util\WinApi.cs" />
-    <Compile Include="WhenPayloadProcessExits.cs" />
+    <Compile Include="WhenConsoleProcessExits.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="ConEmu.xml" />

@@ -45,7 +45,7 @@ namespace ConEmu.WinForms
 
 		private string _sStartupDirectory;
 
-		private WhenPayloadProcessExits _whenPayloadProcessExits = WhenPayloadProcessExits.KeepTerminalAndShowMessage;
+		private WhenConsoleProcessExits _whenPayloadProcessExits = WhenConsoleProcessExits.KeepConsoleEmulatorAndShowMessage;
 
 		public ConEmuStartInfo()
 		{
@@ -296,10 +296,10 @@ namespace ConEmu.WinForms
 		/// <summary>
 		///     <para>Gets or sets whether the terminal emulator view should keep displaying the last contents after the console process specified in <see cref="ConsoleCommandLine" /> exits.</para>
 		///     <para>See comments on enum members for details on specific behavior.</para>
-		///     <para>The default is <see cref="WinForms.WhenPayloadProcessExits.KeepTerminalAndShowMessage" />.</para>
+		///     <para>The default is <see cref="WhenConsoleProcessExits.KeepConsoleEmulatorAndShowMessage" />.</para>
 		///     <para>This property cannot be changed when the process is running.</para>
 		/// </summary>
-		public WhenPayloadProcessExits WhenPayloadProcessExits
+		public WhenConsoleProcessExits WhenPayloadProcessExits
 		{
 			get
 			{

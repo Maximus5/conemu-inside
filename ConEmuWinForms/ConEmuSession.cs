@@ -164,7 +164,7 @@ namespace ConEmu.WinForms
 
 		/// <summary>
 		///     <para>Closes the console emulator window, and kills the console process if it's still running.</para>
-		///     <para>To just kill the console process, use <see cref="KillConsoleProcessAsync" />. If <see cref="ConEmuStartInfo.WhenPayloadProcessExits" /> allows, the terminal emulator window might stay open after that.</para>
+		///     <para>To just kill the console process, use <see cref="KillConsoleProcessAsync" />. If <see cref="ConEmuStartInfo.WhenPayloadProcessExits" /> allows, the console emulator window might stay open after that.</para>
 		/// </summary>
 		public void CloseConsoleEmulator()
 		{
@@ -308,8 +308,8 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		///     <para>Waits until the console emulator closes and the terminal view gets hidden from the control, or completes immediately if it has already exited.</para>
-		///     <para>Note that the console process might have terminated long before this moment without closing the console emulator unless <see cref="WhenPayloadProcessExits.CloseTerminal" /> were selected in the startup options.</para>
+		///     <para>Waits until the console emulator closes and the console emulator view gets hidden from the control, or completes immediately if it has already exited.</para>
+		///     <para>Note that the console process might have terminated long before this moment without closing the console emulator unless <see cref="WhenConsoleProcessExits.CloseConsoleEmulator" /> were selected in the startup options.</para>
 		/// </summary>
 		[NotNull]
 		public Task WaitForConsoleEmulatorCloseAsync()
@@ -319,7 +319,7 @@ namespace ConEmu.WinForms
 
 		/// <summary>
 		///     <para>Waits for the console process running in the console emulator to terminate, or completes immediately if it has already terminated.</para>
-		///     <para>If not <see cref="WhenPayloadProcessExits.CloseTerminal" />, the console emulator stays, otherwise it closes also, and the terminal window is hidden from the control.</para>
+		///     <para>If not <see cref="WhenConsoleProcessExits.CloseConsoleEmulator" />, the console emulator stays, otherwise it closes also, and the console emulator window is hidden from the control.</para>
 		/// </summary>
 		[NotNull]
 		public Task<ConsoleProcessExitedEventArgs> WaitForConsoleProcessExitAsync()
@@ -379,8 +379,8 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		///     <para>Fires on the main thread when the console emulator closes and the terminal window is hidden from the control.</para>
-		///     <para>Note that the console process might have terminated long before this moment without closing the console emulator unless <see cref="WhenPayloadProcessExits.CloseTerminal" /> were selected in the startup options.</para>
+		///     <para>Fires on the main thread when the console emulator closes and the console emulator window is hidden from the control.</para>
+		///     <para>Note that the console process might have terminated long before this moment without closing the console emulator unless <see cref="WhenConsoleProcessExits.CloseConsoleEmulator" /> were selected in the startup options.</para>
 		///     <para>For short-lived processes, this event might fire before you can start sinking it. To get notified reliably, use <see cref="WaitForConsoleEmulatorCloseAsync" /> or <see cref="ConEmuStartInfo.ConsoleEmulatorClosedEventSink" />.</para>
 		/// </summary>
 		[CanBeNull]
@@ -388,7 +388,7 @@ namespace ConEmu.WinForms
 
 		/// <summary>
 		///     <para>Fires on the main thread when the console process running in the console emulator terminates.</para>
-		///     <para>If not <see cref="WhenPayloadProcessExits.CloseTerminal" />, the console emulator stays, otherwise it closes also, and the terminal window is hidden from the control.</para>
+		///     <para>If not <see cref="WhenConsoleProcessExits.CloseConsoleEmulator" />, the console emulator stays, otherwise it closes also, and the console emulator window is hidden from the control.</para>
 		///     <para>For short-lived processes, this event might fire before you can start sinking it. To get notified reliably, use <see cref="WaitForConsoleProcessExitAsync" /> or <see cref="ConEmuStartInfo.PayloadExitedEventSink" />.</para>
 		///     <para>If you're reading the ANSI log with <see cref="AnsiStreamChunkReceived" />, it's guaranteed that all the events for the log will be fired before <see cref="ConsoleProcessExited" />, and there will be no events afterwards.</para>
 		/// </summary>
@@ -473,17 +473,17 @@ namespace ConEmu.WinForms
 			string sConsoleExitMode;
 			switch(startinfo.WhenPayloadProcessExits)
 			{
-			case WhenPayloadProcessExits.CloseTerminal:
+			case WhenConsoleProcessExits.CloseConsoleEmulator:
 				sConsoleExitMode = "n";
 				break;
-			case WhenPayloadProcessExits.KeepTerminal:
+			case WhenConsoleProcessExits.KeepConsoleEmulator:
 				sConsoleExitMode = "c0";
 				break;
-			case WhenPayloadProcessExits.KeepTerminalAndShowMessage:
+			case WhenConsoleProcessExits.KeepConsoleEmulatorAndShowMessage:
 				sConsoleExitMode = "c";
 				break;
 			default:
-				throw new ArgumentOutOfRangeException("ConEmuStartInfo" + "::" + "WhenPayloadProcessExits", startinfo.WhenPayloadProcessExits, "This is not a valid enum value.");
+				throw new ArgumentOutOfRangeException("ConEmuStartInfo" + "::" + "WhenConsoleProcessExits", startinfo.WhenPayloadProcessExits, "This is not a valid enum value.");
 			}
 			cmdl.AppendSwitchIfNotNull("-cur_console:", $"{(startinfo.IsElevated ? "a" : "")}{sConsoleExitMode}");
 
