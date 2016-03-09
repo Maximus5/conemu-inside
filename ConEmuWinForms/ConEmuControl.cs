@@ -2,6 +2,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 using ConEmu.WinForms.Util;
@@ -16,14 +17,21 @@ namespace ConEmu.WinForms
 	/// </summary>
 	public unsafe class ConEmuControl : Control
 	{
-		private ConEmuStartInfo _autostartinfo = new ConEmuStartInfo(); // Enabled by default, and with all default values
-
-		private bool _isEverRun;
+		/// <summary>
+		/// Enabled by default, and with all default values (runs the cmd shell).
+		/// </summary>
+		private ConEmuStartInfo _autostartinfo = new ConEmuStartInfo();
 
 		private bool _isStatusbarVisible = true;
 
-		private int _nLastExitCode;
+		/// <summary>
+		/// After the first console process exits (not session), stores its exit code. Changes on the main thread only.
+		/// </summary>
+		private int? _nLastExitCode;
 
+		/// <summary>
+		/// The running session, if currently running.
+		/// </summary>
 		[CanBeNull]
 		private ConEmuSession _running;
 
@@ -38,12 +46,12 @@ namespace ConEmu.WinForms
 
 		/// <summary>
 		///     <para>Gets or sets whether this control will start the console process as soon as it's loaded on the form: yes if non-<c>NULL</c>, and no if <c>NULL</c>.</para>
-		///     <para>Set this to <c>NULL</c> to prevent the terminal emulator from opening automatically. Adjust this object or assign a new one to setup the initial terminal emulator.</para>
-		///     <para>You can either specify the console executable to run in <see cref="ConEmuStartInfo.ConsoleProcessCommandLine" /> (the console window will close as soon as it exits), or use its default value <see cref="ConEmuConstants.DefaultConsoleCommandLine" /> for the default Windows console and execute your command in that console with <see cref="ConEmuSession.WriteInputText" /> (the console will remain operable after the command completes).</para>
+		///     <para>Set this to <c>NULL</c> to prevent the console emulator from opening automatically. Adjust this object or assign a new one to setup the console process to be run in the console emulator automatically.</para>
+		///     <para>You can either specify the console executable to run in <see cref="ConEmuStartInfo.ConsoleProcessCommandLine" />, or use its default value <see cref="ConEmuConstants.DefaultConsoleCommandLine" /> for the default Windows console and execute your command in that console with <see cref="ConEmuSession.WriteInputText" /> (the console will remain operable and ready to run more commands after the command completes).</para>
 		/// </summary>
 		/// <remarks>
-		///     <para>This object cannot be changed after the console emulator starts. The value of the property becomes <c>NULL</c> and cannot be changed either.</para>
-		///     <para>If you're chaning <c>NULL</c> to non-<c>NULL</c> and the control has already been loaded, it will start executing with these params immediately, so make sure you've completed settings up all the parameters before making the assignment.</para>
+		///     <para>This object cannot be changed after the first <see cref="RunningSession">console emulator session</see> starts. The value of the property becomes <c>NULL</c> and cannot be changed either.</para>
+		///     <para>If you're chaning <c>NULL</c> to non-<c>NULL</c> and the control has already been loaded, it will start executing a new session with these parameters immediately, so make sure you've completed settings up all the parameters before making the assignment.</para>
 		/// </remarks>
 		[CanBeNull]
 		public ConEmuStartInfo AutoStartInfo
@@ -54,8 +62,8 @@ namespace ConEmu.WinForms
 			}
 			set
 			{
-				if(_isEverRun)
-					throw new InvalidOperationException("AutoStartInfo can only be changed before the first console process runs in this control.");
+				if(State != States.Unused)
+					throw new InvalidOperationException("AutoStartInfo can only be changed before the first console emulator session runs in this control.");
 				_autostartinfo = value;
 
 				// Invariant: if changed to TRUE past the normal AutoStartInfo checking point
@@ -65,7 +73,7 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		/// Gets or sets whether the status bar should be visible in the terminal (when it's open in the control).
+		/// Gets or sets whether the status bar of the console emulator view should be visible.
 		/// </summary>
 		public bool IsStatusbarVisible
 		{
@@ -83,7 +91,7 @@ namespace ConEmu.WinForms
 		/// <summary>
 		///     <para>Gets the exit code of the most recently terminated console process.</para>
 		///     <para><c>NULL</c> if no console process has exited in this control yet.</para>
-		///     <para>Note that a console process is currently running in the terminal you'd be getting the previous exit code until it exits.</para>
+		///     <para>Note that if a console process is currently running in the console emulator then you'd be getting the previous exit code until it exits.</para>
 		/// </summary>
 		public int? LastExitCode
 		{
@@ -94,49 +102,62 @@ namespace ConEmu.WinForms
 				ConEmuSession running = _running;
 				if((running != null) && (running.IsConsoleProcessExited))
 					return running.GetConsoleProcessExitCode();
-				return _isEverRun ? _nLastExitCode : default(int?); // No terminal open or current process still running in the terminal, use prev exit code if there were
+				return _nLastExitCode; // No console emulator open or current process still running in the console emulator, use prev exit code if there were
 			}
 		}
 
 		/// <summary>
-		///     <para>Gets the running terminal session, or <c>NULL</c>, if there is currently none.</para>
-		///     <para>A session represents an open terminal displayed in the control, in which a console process is either still running, or has already exited.</para>
-		///     <para>To get the running session object in a reliable way for possibly short-running sessions, call <see cref="Start" /> explicitly, and pass in the event sinks.</para>
+		///     <para>Gets the running console emulator session, or <c>NULL</c> if there currently is none.</para>
+		///     <para>A session represents an open console emulator view displayed in the control, in which a console process is either still running, or has already terminated.</para>
+		///     <para>To guarantee getting the running session object of a short-lived session before it closes, call <see cref="Start" /> manually rather than rely on <see cref="AutoStartInfo" />.</para>
+		///     <para>This only changes on the main thread.</para>
 		/// </summary>
 		[CanBeNull]
 		public ConEmuSession RunningSession => _running;
 
 		/// <summary>
-		///     <para>Gets the current state of the control regarding what's running in it.</para>
+		///     <para>Gets the current state of the console emulator control regarding whether a console emulator is open in it, and whether there is still a console process running in that emulator.</para>
 		///     <para>This only changes on the main thread.</para>
 		/// </summary>
-		public States TerminalState => _running != null ? (_running.IsConsoleProcessExited ? States.ConsoleEmulatorEmpty : States.ConsoleEmulatorWithConsoleProcess) : (_isEverRun ? States.Recycled : States.Unused);
+		public States State => _running != null ? (_running.IsConsoleProcessExited ? States.ConsoleEmulatorEmpty : States.ConsoleEmulatorWithConsoleProcess) : (_nLastExitCode.HasValue ? States.Recycled : States.Unused);
 
 		/// <summary>
-		/// Gets whether there is an open terminal displayed in the control. Of <see cref="TerminalState" />, that's either <see cref="States.ConsoleEmulatorWithConsoleProcess" /> or <see cref="States.ConsoleEmulatorEmpty" />.
+		///     <para>Gets whether a console emulator is currently open, and its console window view is displayed in the control. Of <see cref="State" />, that's either <see cref="States.ConsoleEmulatorWithConsoleProcess" /> or <see cref="States.ConsoleEmulatorEmpty" />.</para>
+		///     <para>When a console emulator is not open, the control is blank.</para>
+		///     <para>This only changes on the main thread.</para>
 		/// </summary>
-		public bool IsTerminalOpen => _running != null;
+		public bool IsConsoleEmulatorOpen => _running != null;
 
 		/// <summary>
-		/// Starts a new console process in the console emulator control.
+		///     <para>Starts a new console process in the console emulator control, and shows the console emulator view. When a session is not running, the control is blank.</para>
+		///     <para>If another <see cref="RunningSession">session</see> is running, it will be closed, and the new session will replace it. <see cref="AutoStartInfo" /> will call <see cref="Start" /> and create a session automatically if configured.</para>
 		/// </summary>
+		/// <remarks>
+		///     <para>The control state transitions to <see cref="States.ConsoleEmulatorWithConsoleProcess" />, then to <see cref="States.ConsoleEmulatorEmpty" /> (unless configured to close on exit), then to <see cref="States.Recycled" />.</para>
+		/// </remarks>
+		/// <returns>Returns the newly-started session, as in <see cref="RunningSession" />.</returns>
 		[NotNull]
 		public ConEmuSession Start([NotNull] ConEmuStartInfo startinfo)
 		{
 			if(startinfo == null)
 				throw new ArgumentNullException(nameof(startinfo));
+
+			// Close prev session if there is one
+			_running?.CloseConsoleEmulator();
 			if(_running != null)
-				throw new InvalidOperationException("Cannot start a new console process because another one is already running.");
+				throw new InvalidOperationException("Cannot start a new console process because another console emulator session has failed to close in due time.");
 
 			_autostartinfo = null; // As we're starting, no more chance for an autostart
 			if(!IsHandleCreated)
 				CreateHandle();
+
+			// Spawn session
 			var session = new ConEmuSession(startinfo, new ConEmuSession.HostContext((void*)Handle, IsStatusbarVisible));
 			_running = session;
-			_isEverRun = true;
-			TerminalStateChanged?.Invoke(this, EventArgs.Empty);
+			StateChanged?.Invoke(this, EventArgs.Empty);
 
-			session.ConsoleEmulatorClosed += delegate
+			// Wait for its exit
+			session.WaitForConsoleEmulatorCloseAsync().ContinueWith(scheduler : TaskScheduler.FromCurrentSynchronizationContext(), continuationAction : task =>
 			{
 				try
 				{
@@ -148,8 +169,9 @@ namespace ConEmu.WinForms
 				}
 				_running = null;
 				Invalidate();
-				TerminalStateChanged?.Invoke(this, EventArgs.Empty);
-			};
+				StateChanged?.Invoke(this, EventArgs.Empty);
+			});
+
 			return session;
 		}
 
@@ -211,9 +233,9 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		/// Fires on the main thread whenever <see cref="TerminalState" /> changes.
+		/// Fires on the main thread whenever <see cref="State" /> changes.
 		/// </summary>
-		public event EventHandler TerminalStateChanged;
+		public event EventHandler StateChanged;
 
 		[CanBeNull]
 		private void* TryGetConEmuHwnd()

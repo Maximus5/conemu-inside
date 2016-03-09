@@ -56,7 +56,7 @@ namespace ConEmuInside
 			stack.Controls.Add(btn = new Button() {Text = "&Ping", AutoSize = true, Dock = DockStyle.Left});
 			btn.Click += delegate
 			{
-				if(conemu.IsTerminalOpen)
+				if(conemu.IsConsoleEmulatorOpen)
 				{
 					MessageBox.Show(this, "The console is busy right now.", "Ping", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
 					return;
