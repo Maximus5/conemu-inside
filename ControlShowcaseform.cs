@@ -42,7 +42,7 @@ namespace ConEmuInside
 			btn.Click += delegate { conemu.RunningSession?.BeginGuiMacro("GetInfo").WithParam("PID").ExecuteAsync().ContinueWith(task => txt.Text = $"ConEmu PID: {Regex.Replace(task.Result.Response, "\\s+", " ")}", TaskScheduler.FromCurrentSynchronizationContext()); };
 
 			stack.Controls.Add(btn = new Button() {Text = "Kill Payload", AutoSize = true, Dock = DockStyle.Left});
-			btn.Click += delegate { conemu.RunningSession?.KillConsolePayloadProcessAsync(); };
+			btn.Click += delegate { conemu.RunningSession?.KillConsoleProcessAsync(); };
 
 			stack.Controls.Add(btn = new Button() {Text = "Ctrl+C", AutoSize = true, Dock = DockStyle.Left});
 			btn.Click += delegate { conemu.RunningSession?.SendControlCAsync(); };
@@ -69,12 +69,12 @@ namespace ConEmuInside
 			stack.Controls.Add(btn = new Button() {Text = "&Choice", AutoSize = true, Dock = DockStyle.Left});
 			btn.Click += delegate
 			{
-				conemu.RunningSession?.KillConsoleEmulator();
+				conemu.RunningSession?.CloseConsoleEmulator();
 				DialogResult result = MessageBox.Show(this, "Keep terminal when payload exits?", "Choice", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
 				if(result == DialogResult.Cancel)
 					return;
 				ConEmuSession session = conemu.Start(new ConEmuStartInfo() {ConsoleCommandLine = "choice", IsEchoingConsoleCommandLine = true, WhenPayloadProcessExits = result == DialogResult.Yes ? WhenPayloadProcessExits.KeepTerminalAndShowMessage : WhenPayloadProcessExits.CloseTerminal, PayloadExitedEventSink = (sender, args) => MessageBox.Show($"Your choice is {args.ExitCode} (powered by startinfo event sink).")});
-				session.WaitForConsolePayloadExitAsync().ContinueWith(task => MessageBox.Show($"Your choice is {task.Result.ExitCode} (powered by wait-for-exit-async)."));
+				session.WaitForConsoleProcessExitAsync().ContinueWith(task => MessageBox.Show($"Your choice is {task.Result.ExitCode} (powered by wait-for-exit-async)."));
 			};
 		}
 	}

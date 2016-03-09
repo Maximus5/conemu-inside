@@ -136,7 +136,7 @@ namespace ConEmu.WinForms
 			_isEverRun = true;
 			TerminalStateChanged?.Invoke(this, EventArgs.Empty);
 
-			session.ConsoleEmulatorExited += delegate
+			session.ConsoleEmulatorClosed += delegate
 			{
 				try
 				{
@@ -169,7 +169,7 @@ namespace ConEmu.WinForms
 			{
 				try
 				{
-					_running.KillConsoleEmulator();
+					_running.CloseConsoleEmulator();
 				}
 				catch(Exception)
 				{

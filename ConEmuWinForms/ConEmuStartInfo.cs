@@ -27,7 +27,7 @@ namespace ConEmu.WinForms
 
 		private bool _isUsedUp;
 
-		private EventHandler<ProcessExitedEventArgs> _payloadExitedEventSink;
+		private EventHandler<ConsoleProcessExitedEventArgs> _payloadExitedEventSink;
 
 		[NotNull]
 		private string _sConEmuConsoleExtenderExecutablePath = "";
@@ -164,10 +164,10 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		///     <para>Gets or sets an event sink for <see cref="ConEmuSession.ConsoleEmulatorExited" /> to get reliably notified even for short-lived processes.</para>
+		///     <para>Gets or sets an event sink for <see cref="ConEmuSession.ConsoleEmulatorClosed" /> to get reliably notified even for short-lived processes.</para>
 		/// </summary>
 		[CanBeNull]
-		public EventHandler ConsoleEmulatorExitedEventSink
+		public EventHandler ConsoleEmulatorClosedEventSink
 		{
 			get
 			{
@@ -260,10 +260,10 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		///     <para>Gets or sets an event sink for <see cref="ConEmuSession.PayloadExited" /> to get reliably notified even for short-lived processes.</para>
+		///     <para>Gets or sets an event sink for <see cref="ConEmuSession.ConsoleProcessExited" /> to get reliably notified even for short-lived processes.</para>
 		/// </summary>
 		[CanBeNull]
-		public EventHandler<ProcessExitedEventArgs> PayloadExitedEventSink
+		public EventHandler<ConsoleProcessExitedEventArgs> PayloadExitedEventSink
 		{
 			get
 			{

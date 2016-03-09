@@ -26,7 +26,7 @@ namespace ConEmu.WinForms
 {
 	/// <summary>
 	///     <para>A single session of the console emulator running a console process. Each console process execution in the control spawns a new console emulator and a new session.</para>
-	/// <para>When the console emulator starts, a console view appears in the control. The console process starts running in it immediately. When the console process terminates, the console emulator might or might not be closed, depending on the settings. After the console emulator closes, the control stops viewing the console, and this session ends.</para>
+	///     <para>When the console emulator starts, a console view appears in the control. The console process starts running in it immediately. When the console process terminates, the console emulator might or might not be closed, depending on the settings. After the console emulator closes, the control stops viewing the console, and this session ends.</para>
 	/// </summary>
 	public class ConEmuSession
 	{
@@ -62,7 +62,7 @@ namespace ConEmu.WinForms
 		/// <summary>
 		/// The exit code of the console process, if it has already exited. <c>Null</c>, if the console process is still running within the console emulator.
 		/// </summary>
-		private int? _nConsoleProcessExitCode2;
+		private int? _nConsoleProcessExitCode;
 
 		/// <summary>
 		/// The ConEmu process, even after it exits.
@@ -92,8 +92,14 @@ namespace ConEmu.WinForms
 		/// Task-based notification of the console process exiting.
 		/// </summary>
 		[NotNull]
-		private readonly TaskCompletionSource<ProcessExitedEventArgs> _taskConsoleProcessExit = new TaskCompletionSource<ProcessExitedEventArgs>();
+		private readonly TaskCompletionSource<ConsoleProcessExitedEventArgs> _taskConsoleProcessExit = new TaskCompletionSource<ConsoleProcessExitedEventArgs>();
 
+		/// <summary>
+		/// Starts the session.
+		/// Opens the emulator view in the control (HWND given in <paramref name="hostcontext" />) by starting the ConEmu child process and giving it that HWND; ConEmu then starts the child Console Process for the commandline given in <paramref name="startinfo" /> and makes it run in the console emulator window.
+		/// </summary>
+		/// <param name="startinfo">User-defined startup parameters for the console process.</param>
+		/// <param name="hostcontext">Control-related parameters.</param>
 		public ConEmuSession([NotNull] ConEmuStartInfo startinfo, [NotNull] HostContext hostcontext)
 		{
 			if(startinfo == null)
@@ -104,7 +110,7 @@ namespace ConEmu.WinForms
 				throw new InvalidOperationException($"Cannot start a new console process for command line “{startinfo.ConsoleCommandLine}” because it's either NULL, or empty, or whitespace.");
 
 			_startinfo = startinfo;
-			startinfo.MarkAsUsedUp();
+			startinfo.MarkAsUsedUp(); // No more changes allowed in this copy
 
 			// Directory for working files, +cleanup
 			_dirTempWorkingFolder = Init_TempWorkingFolder();
@@ -128,26 +134,21 @@ namespace ConEmu.WinForms
 			_lifetime.Add(() => ((IDisposable)_guiMacroExecutor).Dispose());
 
 			// Monitor payload process
-			Init_PayloadProcessMonitoring();
+			Init_ConsoleProcessMonitoring();
 		}
 
 		/// <summary>
-		/// <para>Gets whether the console process has already exited (see <see cref="PayloadExited" />). The console emulator view might have closed as well, but might have not (see <see cref="ConEmuStartInfo.WhenPayloadProcessExits"/>).</para>
-		/// <para>This state only changes on the main thread.</para>
+		///     <para>Gets whether the console process has already exited (see <see cref="ConsoleProcessExited" />). The console emulator view might have closed as well, but might have not (see <see cref="ConEmuStartInfo.WhenPayloadProcessExits" />).</para>
+		///     <para>This state only changes on the main thread.</para>
 		/// </summary>
-		public bool IsConsoleProcessExited => _nConsoleProcessExitCode2.HasValue;
+		public bool IsConsoleProcessExited => _nConsoleProcessExitCode.HasValue;
 
 		/// <summary>
-		/// Gets the start info with which this session has been started.
+		///     <para>Gets the start info with which this session has been started.</para>
+		///     <para>All of the properties in this object are now readonly.</para>
 		/// </summary>
 		[NotNull]
-		public ConEmuStartInfo StartInfo
-		{
-			get
-			{
-				return _startinfo;
-			}
-		}
+		public ConEmuStartInfo StartInfo => _startinfo;
 
 		/// <summary>
 		/// Starts construction of the ConEmu GUI Macro, see http://conemu.github.io/en/GuiMacro.html .
@@ -162,7 +163,27 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		/// Executes a ConEmu GUI Macro on the active console, see http://conemu.github.io/en/GuiMacro.html .
+		///     <para>Closes the console emulator window, and kills the console process if it's still running.</para>
+		///     <para>To just kill the console process, use <see cref="KillConsoleProcessAsync" />. If <see cref="ConEmuStartInfo.WhenPayloadProcessExits" /> allows, the terminal emulator window might stay open after that.</para>
+		/// </summary>
+		public void CloseConsoleEmulator()
+		{
+			try
+			{
+				if(!_process.HasExited)
+					BeginGuiMacro("Close").WithParam(1 /*terminate active process*/).WithParam(1 /*without confirmation*/).ExecuteSync();
+				if(!_process.HasExited)
+					_process.Kill();
+			}
+			catch(Exception)
+			{
+				// Might be a race, so in between HasExited and Kill state could change, ignore possible errors here
+			}
+		}
+
+		/// <summary>
+		///     <para>Executes a ConEmu GUI Macro on the active console, see http://conemu.github.io/en/GuiMacro.html .</para>
+		///     <para>This function takes for formatted text of a GUI Macro; to format parameters correctly, better use the <see cref="BeginGuiMacro" /> and the macro builder.</para>
 		/// </summary>
 		/// <param name="macrotext">The full macro command, see http://conemu.github.io/en/GuiMacro.html .</param>
 		public Task<GuiMacroResult> ExecuteGuiMacroTextAsync([NotNull] string macrotext)
@@ -178,7 +199,8 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		/// Executes a ConEmu GUI Macro on the active console, see http://conemu.github.io/en/GuiMacro.html , synchronously.
+		///     <para>Executes a ConEmu GUI Macro on the active console, see http://conemu.github.io/en/GuiMacro.html , synchronously.</para>
+		///     <para>This function takes for formatted text of a GUI Macro; to format parameters correctly, better use the <see cref="BeginGuiMacro" /> and the macro builder.</para>
 		/// </summary>
 		/// <param name="macrotext">The full macro command, see http://conemu.github.io/en/GuiMacro.html .</param>
 		public GuiMacroResult ExecuteGuiMacroTextSync([NotNull] string macrotext)
@@ -205,74 +227,53 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		/// <para>Gets the exit code of the console process, if <see cref="IsConsoleProcessExited">it has already exited</see>. Throws an exception if it has not.</para>
-		/// <para>This state only changes on the main thread.</para>
+		///     <para>Gets the exit code of the console process, if <see cref="IsConsoleProcessExited">it has already exited</see>. Throws an exception if it has not.</para>
+		///     <para>This state only changes on the main thread.</para>
 		/// </summary>
 		public int GetConsoleProcessExitCode()
 		{
-			int? nCode = _nConsoleProcessExitCode2;
+			int? nCode = _nConsoleProcessExitCode;
 			if(!nCode.HasValue)
 				throw new InvalidOperationException("The exit code is not available yet because the console process is still running.");
 			return nCode.Value;
 		}
 
 		/// <summary>
-		/// Kills the whole console emulator process if it is running. This also terminates the console emulator window.	// TODO: kill payload process only when we know its pid
-		/// </summary>
-		public void KillConsoleEmulator()
-		{
-			try
-			{
-				if(!_process.HasExited)
-					BeginGuiMacro("Close").WithParam(1 /*terminate active process*/).WithParam(1 /*without confirmation*/).ExecuteSync();
-			}
-			catch(Exception)
-			{
-				// Might be a race, so in between HasExited and Kill state could change, ignore possible errors here
-			}
-		}
-
-		/// <summary>
-		///     <para>Kills the console payload process, if it's running.</para>
+		///     <para>Kills the console process running in the console emulator window, if it has not exited yet.</para>
 		///     <para>This does not necessarily kill the console emulator process which displays the console window, but it might also close if <see cref="ConEmuStartInfo.WhenPayloadProcessExits" /> says so.</para>
 		/// </summary>
+		/// <returns>Whether the process were killed (otherwise it has been terminated due to some other reason, e.g. exited on its own or killed by a third party).</returns>
 		[NotNull]
-		public Task<bool> KillConsolePayloadProcessAsync()
+		public async Task<bool> KillConsoleProcessAsync()
 		{
 			try
 			{
-				if((!_process.HasExited) && (!_nConsoleProcessExitCode2.HasValue))
+				if((!_process.HasExited) && (!_nConsoleProcessExitCode.HasValue))
 				{
-					return GetInfoRoot.QueryAsync(this).ContinueWith(task =>
+					GetInfoRoot rootinfo = await GetInfoRoot.QueryAsync(this);
+					if(!rootinfo.Pid.HasValue)
+						return false; // Has already exited
+					try
 					{
-						if(task.Status != TaskStatus.RanToCompletion)
-							return false;
-						if(!task.Result.Pid.HasValue)
-							return false;
-						try
-						{
-							Process.GetProcessById((int)task.Result.Pid.Value).Kill();
-						}
-						catch(Exception)
-						{
-							// Most likely, has already exited
-						}
+						Process.GetProcessById((int)rootinfo.Pid.Value).Kill();
 						return true;
-					});
+					}
+					catch(Exception)
+					{
+						// Most likely, has already exited
+					}
 				}
 			}
 			catch(Exception)
 			{
 				// Might be a race, so in between HasExited and Kill state could change, ignore possible errors here
 			}
-			var tcs = new TaskCompletionSource<bool>();
-			tcs.SetResult(true);
-			return tcs.Task;
+			return false;
 		}
 
 		/// <summary>
-		///     <para>Sends the Control+Break signal to the payload console process, which will most likely abort it.</para>
-		///     <para>Unlike <see cref="KillConsolePayloadProcessAsync" />, this is a soft signal which might be processed by the console process for a graceful shutdown, or ignored altogether.</para>
+		///     <para>Sends the <c>Control+Break</c> signal to the console process, which will most likely abort it.</para>
+		///     <para>Unlike <see cref="KillConsoleProcessAsync" />, this is a soft signal which might be processed by the console process for a graceful shutdown, or ignored altogether.</para>
 		/// </summary>
 		public Task SendControlBreakAsync()
 		{
@@ -289,8 +290,8 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		///     <para>Sends the Control+C signal to the payload console process, which will most likely abort it.</para>
-		///     <para>Unlike <see cref="KillConsolePayloadProcessAsync" />, this is a soft signal which might be processed by the console process for a graceful shutdown, or ignored altogether.</para>
+		///     <para>Sends the <c>Control+C</c> signal to the payload console process, which will most likely abort it.</para>
+		///     <para>Unlike <see cref="KillConsoleProcessAsync" />, this is a soft signal which might be processed by the console process for a graceful shutdown, or ignored altogether.</para>
 		/// </summary>
 		public Task SendControlCAsync()
 		{
@@ -307,19 +308,21 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		///     <para>Waits until the console emulator process exits and stops rendering the terminal view, or completes immediately if it has already exited.</para>
+		///     <para>Waits until the console emulator closes and the terminal view gets hidden from the control, or completes immediately if it has already exited.</para>
+		///     <para>Note that the console process might have terminated long before this moment without closing the console emulator unless <see cref="WhenPayloadProcessExits.CloseTerminal" /> were selected in the startup options.</para>
 		/// </summary>
 		[NotNull]
-		public Task WaitForConsoleEmulatorExitAsync()
+		public Task WaitForConsoleEmulatorCloseAsync()
 		{
 			return _taskConsoleEmulatorClosed.Task;
 		}
 
 		/// <summary>
-		/// Waits for the payload console command to exit within the terminal, or completes immediately if it has already exited. If not <see cref="WhenPayloadProcessExits.CloseTerminal" />, the terminal stays, otherwise it closes also.
+		///     <para>Waits for the console process running in the console emulator to terminate, or completes immediately if it has already terminated.</para>
+		///     <para>If not <see cref="WhenPayloadProcessExits.CloseTerminal" />, the console emulator stays, otherwise it closes also, and the terminal window is hidden from the control.</para>
 		/// </summary>
 		[NotNull]
-		public Task<ProcessExitedEventArgs> WaitForConsolePayloadExitAsync()
+		public Task<ConsoleProcessExitedEventArgs> WaitForConsoleProcessExitAsync()
 		{
 			return _taskConsoleProcessExit.Task;
 		}
@@ -353,10 +356,10 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		///     <para>Fires when the console process writes into its output or error stream. Gets a chunk of the raw ANSI stream contents.</para>
-		///     <para>For processes which write immediately on startup, this event might fire some chunks before you sink it. To get notified reliably, use <see cref="ConEmuStartInfo.AnsiStreamChunkReceivedEventSink" />.</para>
+		///     <para>Fires on the main thread when the console process writes into its output or error streams. Gets a chunk of the raw ANSI stream contents.</para>
+		///     <para>For processes which write immediately on startup, this event might fire some chunks before you can start sinking it. To get notified reliably, use <see cref="ConEmuStartInfo.AnsiStreamChunkReceivedEventSink" />.</para>
 		///     <para>To enable sinking this event, you must have <see cref="ConEmuStartInfo.IsReadingAnsiStream" /> set to <c>True</c> before starting the console process.</para>
-		///     <para>If you're reading the ANSI log with <see cref="AnsiStreamChunkReceived" />, it's guaranteed that all the events for the log will be fired before <see cref="PayloadExited" />, and there will be no events afterwards.</para>
+		///     <para>If you're reading the ANSI log with <see cref="AnsiStreamChunkReceived" />, it's guaranteed that all the events for the log will be fired before <see cref="ConsoleProcessExited" />, and there will be no events afterwards.</para>
 		/// </summary>
 		[SuppressMessage("ReSharper", "DelegateSubtraction")]
 		public event EventHandler<AnsiStreamChunkEventArgs> AnsiStreamChunkReceived
@@ -376,10 +379,20 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		///     <para>Fires when the console emulator process exits and stops rendering the terminal view. Note that the root command might have had stopped running long before this moment if not <see cref="WhenPayloadProcessExits.CloseTerminal" /> prevents terminating the terminal view immediately.</para>
-		///     <para>For short-lived processes, this event might fire before you sink it. To get notified reliably, use <see cref="WaitForConsoleEmulatorExitAsync" /> or <see cref="ConEmuStartInfo.ConsoleEmulatorExitedEventSink" />.</para>
+		///     <para>Fires on the main thread when the console emulator closes and the terminal window is hidden from the control.</para>
+		///     <para>Note that the console process might have terminated long before this moment without closing the console emulator unless <see cref="WhenPayloadProcessExits.CloseTerminal" /> were selected in the startup options.</para>
+		///     <para>For short-lived processes, this event might fire before you can start sinking it. To get notified reliably, use <see cref="WaitForConsoleEmulatorCloseAsync" /> or <see cref="ConEmuStartInfo.ConsoleEmulatorClosedEventSink" />.</para>
 		/// </summary>
-		public event EventHandler ConsoleEmulatorExited;
+		[CanBeNull]
+		public event EventHandler ConsoleEmulatorClosed;
+
+		/// <summary>
+		///     <para>Fires on the main thread when the console process running in the console emulator terminates.</para>
+		///     <para>If not <see cref="WhenPayloadProcessExits.CloseTerminal" />, the console emulator stays, otherwise it closes also, and the terminal window is hidden from the control.</para>
+		///     <para>For short-lived processes, this event might fire before you can start sinking it. To get notified reliably, use <see cref="WaitForConsoleProcessExitAsync" /> or <see cref="ConEmuStartInfo.PayloadExitedEventSink" />.</para>
+		///     <para>If you're reading the ANSI log with <see cref="AnsiStreamChunkReceived" />, it's guaranteed that all the events for the log will be fired before <see cref="ConsoleProcessExited" />, and there will be no events afterwards.</para>
+		/// </summary>
+		public event EventHandler<ConsoleProcessExitedEventArgs> ConsoleProcessExited;
 
 		[NotNull]
 		private AnsiLog Init_AnsiLog([NotNull] ConEmuStartInfo startinfo)
@@ -396,6 +409,23 @@ namespace ConEmu.WinForms
 			_lifetime.Add(() => timer.Dispose());
 
 			return ansilog;
+		}
+
+		/// <summary>
+		/// Watches for the status of the payload console process to fetch its exitcode when done and notify user of that.
+		/// </summary>
+		private void Init_ConsoleProcessMonitoring()
+		{
+			// When the payload process exits, use its exit code
+			Action<Task<int?>> λExited = task =>
+			{
+				if(!task.Result.HasValue) // Means the wait were aborted, e.g. ConEmu has been shut down and we processed that on the main thread
+					return;
+				TryFireConsoleProcessExited(task.Result.Value);
+			};
+
+			// Detect when this happens
+			Init_PayloadProcessMonitoring_WaitForExitCodeAsync().ContinueWith(λExited, _schedulerSta /* to the main thread*/);
 		}
 
 		[NotNull]
@@ -587,29 +617,14 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		/// Watches for the status of the payload process to fetch its exitcode when done and notify user of that.
+		/// Async-loop retries for getting the root payload process to await its exit.
 		/// </summary>
-		private void Init_PayloadProcessMonitoring()
-		{
-			// When the payload process exits, use its exit code
-			Action<Task<int?>> λExited = task =>
-			{
-				if(!task.Result.HasValue) // Means the wait were aborted, e.g. ConEmu has been shut down and we processed that on the main thread
-					return;
-				TryFirePayloadExited(task.Result.Value);
-			};
-
-			// Detect when this happens
-			Init_PayloadProcessMonitoring_WaitForExitCodeAsync().ContinueWith(λExited, _schedulerSta /* to the main thread*/);
-		}
-
 		private async Task<int?> Init_PayloadProcessMonitoring_WaitForExitCodeAsync()
 		{
-			// Async-loop retries for getting the root payload process to await its exit
 			for(;;)
 			{
 				// Might have been terminated on the main thread
-				if(_nConsoleProcessExitCode2.HasValue)
+				if(_nConsoleProcessExitCode.HasValue)
 					return null;
 				if(_process.HasExited)
 					return null;
@@ -669,10 +684,10 @@ namespace ConEmu.WinForms
 						TerminateLifetime();
 
 						// If we haven't separately caught an exit of the payload process
-						TryFirePayloadExited(_process.ExitCode /* We haven't caught the exit of the payload process, so we haven't gotten a message with its errorlevel as well. Assume ConEmu propagates its exit code, as there ain't other way for getting it now */);
+						TryFireConsoleProcessExited(_process.ExitCode /* We haven't caught the exit of the payload process, so we haven't gotten a message with its errorlevel as well. Assume ConEmu propagates its exit code, as there ain't other way for getting it now */);
 
 						// Fire client total exited event
-						ConsoleEmulatorExited?.Invoke(this, EventArgs.Empty);
+						ConsoleEmulatorClosed?.Invoke(this, EventArgs.Empty);
 					});
 				};
 
@@ -715,22 +730,15 @@ namespace ConEmu.WinForms
 
 			// Advise events before they got chance to fire, use event sinks from startinfo for guaranteed delivery
 			if(startinfo.PayloadExitedEventSink != null)
-				PayloadExited += startinfo.PayloadExitedEventSink;
-			if(startinfo.ConsoleEmulatorExitedEventSink != null)
-				ConsoleEmulatorExited += startinfo.ConsoleEmulatorExitedEventSink;
+				ConsoleProcessExited += startinfo.PayloadExitedEventSink;
+			if(startinfo.ConsoleEmulatorClosedEventSink != null)
+				ConsoleEmulatorClosed += startinfo.ConsoleEmulatorClosedEventSink;
 
 			// Re-issue events as async tasks
 			// As we advise events before they even fire, the task is guaranteed to get its state
-			PayloadExited += (sender, args) => _taskConsoleProcessExit.SetResult(args);
-			ConsoleEmulatorExited += delegate { _taskConsoleEmulatorClosed.SetResult(Missing.Value); };
+			ConsoleProcessExited += (sender, args) => _taskConsoleProcessExit.SetResult(args);
+			ConsoleEmulatorClosed += delegate { _taskConsoleEmulatorClosed.SetResult(Missing.Value); };
 		}
-
-		/// <summary>
-		///     <para>Fires when the payload command exits within the terminal. If not <see cref="WhenPayloadProcessExits.CloseTerminal" />, the terminal stays, otherwise it closes also.</para>
-		///     <para>For short-lived processes, this event might fire before you sink it. To get notified reliably, use <see cref="WaitForConsolePayloadExitAsync" /> or <see cref="ConEmuStartInfo.PayloadExitedEventSink" />.</para>
-		///     <para>If you're reading the ANSI log with <see cref="AnsiStreamChunkReceived" />, it's guaranteed that all the events for the log will be fired before <see cref="PayloadExited" />, and there will be no events afterwards.</para>
-		/// </summary>
-		public event EventHandler<ProcessExitedEventArgs> PayloadExited;
 
 		private void TerminateLifetime()
 		{
@@ -744,23 +752,26 @@ namespace ConEmu.WinForms
 		/// <summary>
 		/// Fires the payload exited event if it has not been fired yet.
 		/// </summary>
-		/// <param name="nPayloadExitCode"></param>
-		private void TryFirePayloadExited(int nPayloadExitCode)
+		/// <param name="nConsoleProcessExitCode"></param>
+		private void TryFireConsoleProcessExited(int nConsoleProcessExitCode)
 		{
-			if(_nConsoleProcessExitCode2.HasValue) // It's OK to call it from multiple places, e.g. when payload exit were detected and when ConEmu process itself exits
+			if(_nConsoleProcessExitCode.HasValue) // It's OK to call it from multiple places, e.g. when payload exit were detected and when ConEmu process itself exits
 				return;
 
 			// Make sure the whole ANSI log contents is pumped out before we notify user
-			// Dispose call pumps all out and makes sure we never ever fire anything on it after we notify user of PayloadExited; multiple calls to Dispose are OK
+			// Dispose call pumps all out and makes sure we never ever fire anything on it after we notify user of ConsoleProcessExited; multiple calls to Dispose are OK
 			_ansilog?.Dispose();
 
 			// Store exit code
-			_nConsoleProcessExitCode2 = nPayloadExitCode;
+			_nConsoleProcessExitCode = nConsoleProcessExitCode;
 
 			// Notify user
-			PayloadExited?.Invoke(this, new ProcessExitedEventArgs(nPayloadExitCode));
+			ConsoleProcessExited?.Invoke(this, new ConsoleProcessExitedEventArgs(nConsoleProcessExitCode));
 		}
 
+		/// <summary>
+		/// Covers parameters of the host control needed to run the session. <see cref="ConEmuStartInfo" /> tells what to run and how, while this class tells “where” and is not directly user-configurable, it's derived from the hosting control.
+		/// </summary>
 		public unsafe class HostContext
 		{
 			public HostContext([NotNull] void* hWndParent, bool isStatusbarVisibleInitial)

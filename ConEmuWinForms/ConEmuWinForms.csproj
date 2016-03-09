@@ -58,7 +58,7 @@
     <Compile Include="GuiMacroExecutor.cs" />
     <Compile Include="GuiMacroBuilder.cs" />
     <Compile Include="GuiMacroResult.cs" />
-    <Compile Include="ProcessExitedEventArgs.cs" />
+    <Compile Include="ConsoleProcessExitedEventArgs.cs" />
     <Compile Include="Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
