@@ -240,6 +240,8 @@ namespace ConEmu.WinForms
 		[CanBeNull]
 		private void* TryGetConEmuHwnd()
 		{
+			if(!IsHandleCreated) // Without this check, getting the Handle would cause the control to be loaded, and AutoStartInfo be executed right in the .ctor, because the first call into this func goes in the .ctor
+				return null;
 			void* hwndConEmu = null;
 			WinApi.EnumWindowsProc callback = (hwnd, param) =>
 			{
