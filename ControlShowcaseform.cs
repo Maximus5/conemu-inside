@@ -20,6 +20,9 @@ namespace ConEmuInside
 			{
 				conemu.AutoStartInfo.SetEnv("one", "two");
 				conemu.AutoStartInfo.SetEnv("geet", "huub");
+				conemu.AutoStartInfo.GreetingText = "• Running \"cmd.exe\" as the default shell in the terminal. \n\n";
+				//conemu.AutoStartInfo.GreetingText = "\"C:\\Program Files\\Git\\bin\\git.exe\" fetch --progress \"--all\" ";	// A test specimen with advanced quoting
+				conemu.AutoStartInfo.IsEchoingConsoleCommandLine = true;
 			}
 			//conemu.AutoStartInfo = null;
 			TextBox txt;
