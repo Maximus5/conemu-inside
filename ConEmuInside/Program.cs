@@ -1,11 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Windows.Forms;
 
 namespace ConEmuInside
 {
-    static class Program
+	static class Program
     {
         /// <summary>
         /// The main entry point for the application.
@@ -15,8 +13,7 @@ namespace ConEmuInside
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-			Application.Run(new ControlShowcaseForm());
-            //Application.Run(new ChildTerminal());
+            Application.Run(new ChildTerminal());
         }
     }
 }

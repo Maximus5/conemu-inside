@@ -49,9 +49,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ControlShowcaseForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
     <Compile Include="Form1.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -88,7 +85,7 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="ConEmuWinForms\ConEmuWinForms.csproj">
+    <ProjectReference Include="..\ConEmuWinForms\ConEmuWinForms.csproj">
       <Project>{1dc7d403-484b-43b4-b017-1356397a32cb}</Project>
       <Name>ConEmuWinForms</Name>
     </ProjectReference>

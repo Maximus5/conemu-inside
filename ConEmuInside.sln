@@ -1,13 +1,15 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.23107.0
+VisualStudioVersion = 14.0.24720.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConEmuInside", "ConEmuInside.csproj", "{44D33E8F-7F78-417D-AA78-E42AEE2071E3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConEmuInside", "ConEmuInside\ConEmuInside.csproj", "{44D33E8F-7F78-417D-AA78-E42AEE2071E3}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConEmuWinForms", "ConEmuWinForms\ConEmuWinForms.csproj", "{1DC7D403-484B-43B4-B017-1356397A32CB}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleUtilityShowcase", "Samples\ConsoleUtilityShowcase\ConsoleUtilityShowcase.csproj", "{ECD0914D-ABAE-468A-9265-10E6DFF6EB80}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ControlDllTestbed", "Tests\ControlDllTestbed\ControlDllTestbed.csproj", "{FEE30B4B-149C-4878-9C62-8ADEF4C8A6C1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -20,6 +22,8 @@ Global
 		{1DC7D403-484B-43B4-B017-1356397A32CB}.Default|Any CPU.Build.0 = Default|Any CPU
 		{ECD0914D-ABAE-468A-9265-10E6DFF6EB80}.Default|Any CPU.ActiveCfg = Default|Any CPU
 		{ECD0914D-ABAE-468A-9265-10E6DFF6EB80}.Default|Any CPU.Build.0 = Default|Any CPU
+		{FEE30B4B-149C-4878-9C62-8ADEF4C8A6C1}.Default|Any CPU.ActiveCfg = Default|Any CPU
+		{FEE30B4B-149C-4878-9C62-8ADEF4C8A6C1}.Default|Any CPU.Build.0 = Default|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
