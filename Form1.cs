@@ -322,7 +322,7 @@ namespace ConEmuInside
                 IntPtr hConEmu = FindWindowEx(termPanel.Handle, (IntPtr)0, null, null);
                 if (hConEmu != (IntPtr)0)
                 {
-                    MoveWindow(hConEmu, 0, 0, termPanel.Width, termPanel.Height, true);
+                    //MoveWindow(hConEmu, 0, 0, termPanel.Width, termPanel.Height, true);
                 }
             }
         }
