@@ -32,9 +32,9 @@ namespace ConsoleUtilityShowcase
 			FlowLayoutPanel stack;
 			form.Controls.Add(stack = new FlowLayoutPanel() {Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.TopDown});
 
-			stack.Controls.Add(new Label() {AutoSize = true, Dock = DockStyle.Top, Text = "Running the ping command."});
+			stack.Controls.Add(new Label() {AutoSize = true, Dock = DockStyle.Top, Text = "Running the ping command.", Padding = new Padding(5)});
 			Label labelWaitOrResult;
-			stack.Controls.Add(labelWaitOrResult = new Label() {AutoSize = true, Dock = DockStyle.Top, Text = "Please wait…"});
+			stack.Controls.Add(labelWaitOrResult = new Label() {AutoSize = true, Dock = DockStyle.Top, Text = "Please wait…", BackColor = Color.Yellow, Padding = new Padding(5)});
 
 			ConEmuControl conemu;
 			var sbText = new StringBuilder();
@@ -44,9 +44,15 @@ namespace ConsoleUtilityShowcase
 			{
 				Match match = Regex.Match(sbText.ToString(), @"\(.*\b(?<pc>\d+)%.*?\)", RegexOptions.Multiline);
 				if(!match.Success)
+				{
 					labelWaitOrResult.Text = "Ping execution completed, failed to parse the result.";
+					labelWaitOrResult.BackColor = Color.PaleVioletRed;
+				}
 				else
+				{
 					labelWaitOrResult.Text = $"Ping execution completed, lost {match.Groups["pc"].Value} per cent of packets.";
+					labelWaitOrResult.BackColor = Color.Lime;
+				}
 			};
 			session.ConsoleEmulatorClosed += delegate { form.Close(); };
 
