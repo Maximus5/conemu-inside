@@ -42,7 +42,7 @@ namespace ConsoleUtilityShowcase
 			ConEmuSession session = conemu.Start(new ConEmuStartInfo() {AnsiStreamChunkReceivedEventSink = (sender, args) => sbText.Append(args.GetMbcsText()), ConsoleProcessCommandLine = "ping 8.8.8.8"});
 			session.ConsoleProcessExited += delegate
 			{
-				Match match = Regex.Match(sbText.ToString(), @"\(.*\b(?<pc>\d+)%\b.*?\)");
+				Match match = Regex.Match(sbText.ToString(), @"\(.*\b(?<pc>\d+)%.*?\)", RegexOptions.Multiline);
 				if(!match.Success)
 					labelWaitOrResult.Text = "Ping execution completed, failed to parse the result.";
 				else
