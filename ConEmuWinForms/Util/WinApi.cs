@@ -94,7 +94,7 @@ namespace ConEmu.WinForms.Util
 					registered?.Unregister(null);
 					tasker.SetResult(true);
 				};
-				registered = ThreadPool.RegisterWaitForSingleObject(hProcessSafe, λHappened, Missing.Value, TimeSpan.MaxValue, true);
+				registered = ThreadPool.RegisterWaitForSingleObject(hProcessSafe, λHappened, Missing.Value, -1, true);
 
 				return tasker.Task;
 			}
