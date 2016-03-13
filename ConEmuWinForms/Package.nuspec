@@ -3,7 +3,7 @@
   <metadata>
     <id>ConEmu.Control.WinForms</id>
     <version>1.0.20160313.1</version> <!-- 1.0, because Nuget only upgrades automatically with the same first components, so probably shan't keep the date in them. -->
-    <title>Windows Forms Control Embedding for ConEmu Console Emulator</title>
+    <title>ConEmu Console Emulator — Windows Forms Control Embedding</title>
     <authors>Maximus5,hypersw</authors>
     <owners>Maximus5,hypersw</owners>
     <projectUrl>http://conemu.github.io/</projectUrl>
