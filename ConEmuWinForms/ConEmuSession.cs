@@ -510,18 +510,44 @@ namespace ConEmu.WinForms
 				throw new ArgumentNullException(nameof(startinfo));
 			if(hostcontext == null)
 				throw new ArgumentNullException(nameof(hostcontext));
+
+			// Take baseline settings from the startinfo
+			XmlDocument xmlBase = startinfo.BaseConfiguration;
+			if(xmlBase.DocumentElement == null)
+				throw new InvalidOperationException("The BaseConfiguration parameter of the ConEmuStartInfo must be a non-empty XmlDocument. This one does not have a root element.");
+			if(xmlBase.DocumentElement.Name != ConEmuConstants.XmlElementKey)
+				throw new InvalidOperationException($"The BaseConfiguration parameter of the ConEmuStartInfo must be an XmlDocument with the root element named “{ConEmuConstants.XmlElementKey}” in an empty namespace. The actual element name is “{xmlBase.DocumentElement.Name}”.");
+			if(!String.Equals(xmlBase.DocumentElement.GetAttribute(ConEmuConstants.XmlAttrName), ConEmuConstants.XmlValueSoftware, StringComparison.OrdinalIgnoreCase))
+				throw new InvalidOperationException($"The BaseConfiguration parameter of the ConEmuStartInfo must be an XmlDocument whose root element is named “{ConEmuConstants.XmlElementKey}” and has an attribute “{ConEmuConstants.XmlAttrName}” set to “{ConEmuConstants.XmlValueSoftware}”. The actual value of this attribute is “{xmlBase.DocumentElement.GetAttribute(ConEmuConstants.XmlAttrName)}”.");
+
 			// Load default template
 			var xmldoc = new XmlDocument();
-			xmldoc.Load(new MemoryStream(Resources.ConEmuSettingsTemplate));
-			XmlNode xmlSettings = xmldoc.SelectSingleNode("/key[@name='Software']/key[@name='ConEmu']/key[@name='.Vanilla']");
-			if(xmlSettings == null)
-				throw new InvalidOperationException("Unexpected mismatch in XML resource structure.");
+			xmldoc.AppendChild(xmldoc.ImportNode(xmlBase.DocumentElement, true));
+
+			// Ensure the settings file has the expected keys structure
+			// As we now allow user-supplied documents, we must ensure these elements exist
+			XmlElement xmlSoftware = xmldoc.DocumentElement;
+			if(xmlSoftware == null)
+				throw new InvalidOperationException("Not expecting the cloned element to be NULL.");
+			var xmlConEmu = xmlSoftware.SelectSingleNode($"{ConEmuConstants.XmlElementKey}[@{ConEmuConstants.XmlAttrName}='{ConEmuConstants.XmlValueConEmu}']") as XmlElement;
+			if(xmlConEmu == null)
+			{
+				xmlSoftware.AppendChild(xmlConEmu = xmldoc.CreateElement(ConEmuConstants.XmlElementKey));
+				xmlConEmu.SetAttribute(ConEmuConstants.XmlAttrName, ConEmuConstants.XmlValueConEmu);
+			}
+			var xmlDotVanilla = xmlSoftware.SelectSingleNode($"{ConEmuConstants.XmlElementKey}[@{ConEmuConstants.XmlAttrName}='{ConEmuConstants.XmlValueDotVanilla}']") as XmlElement;
+			if(xmlDotVanilla == null)
+			{
+				xmlConEmu.AppendChild(xmlDotVanilla = xmldoc.CreateElement(ConEmuConstants.XmlElementKey));
+				xmlDotVanilla.SetAttribute(ConEmuConstants.XmlAttrName, ConEmuConstants.XmlValueDotVanilla);
+			}
 
 			// Apply settings from properties
+			XmlNode xmlSettings = xmlDotVanilla;
 			{
 				string keyname = "StatusBar.Show";
 				var xmlElem = ((XmlElement)(xmlSettings.SelectSingleNode($"value[@name='{keyname}']") ?? xmlSettings.AppendChild(xmldoc.CreateElement("value"))));
-				xmlElem.SetAttribute("name", keyname);
+				xmlElem.SetAttribute(ConEmuConstants.XmlAttrName, keyname);
 				xmlElem.SetAttribute("type", "hex");
 				xmlElem.SetAttribute("data", (hostcontext.IsStatusbarVisibleInitial ? 1 : 0).ToString());
 			}
@@ -531,7 +557,7 @@ namespace ConEmu.WinForms
 			{
 				string keyname = "EnvironmentSet";
 				var xmlElem = ((XmlElement)(xmlSettings.SelectSingleNode($"value[@name='{keyname}']") ?? xmlSettings.AppendChild(xmldoc.CreateElement("value"))));
-				xmlElem.SetAttribute("name", keyname);
+				xmlElem.SetAttribute(ConEmuConstants.XmlAttrName, keyname);
 				xmlElem.SetAttribute("type", "multi");
 				foreach(string key in startinfo.EnumEnv())
 				{

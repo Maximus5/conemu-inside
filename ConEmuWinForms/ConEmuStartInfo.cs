@@ -4,6 +4,8 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
+using System.Xml;
 
 using JetBrains.Annotations;
 
@@ -14,6 +16,9 @@ namespace ConEmu.WinForms
 	/// </summary>
 	public sealed class ConEmuStartInfo
 	{
+		[CanBeNull]
+		private XmlDocument _baseConfiguration;
+
 		[NotNull]
 		private readonly IDictionary<string, string> _environment = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
 
@@ -89,6 +94,34 @@ namespace ConEmu.WinForms
 			{
 				AssertNotUsedUp();
 				_evtAnsiStreamChunkReceivedEventSink = value;
+			}
+		}
+
+		/// <summary>
+		///     <para>The base XML configuration for the ConEmu console emulator, in the standard ConEmu settings files XML format.</para>
+		///     <para>The initial value of the property returns the configuration file which is used by default in the console emulator control. You can change this very document instance, and it will not affect other sessions.</para>
+		///     <para>The final XML settings file which will be supplied to the ConEmu console emulator takes this document as a baseline and applies other relevant properties from this object (as well as host configuration options from the control) on top of it. These changes are applied to a copy, this original document remains unchanged and can be reused.</para>
+		///     <para>This property cannot be changed when the process is running.</para>
+		/// </summary>
+		[NotNull]
+		public XmlDocument BaseConfiguration
+		{
+			get
+			{
+				if(_baseConfiguration != null)
+					return _baseConfiguration;
+
+				var xmldoc = new XmlDocument();
+				xmldoc.Load(new MemoryStream(Resources.ConEmuSettingsTemplate));
+				Thread.MemoryBarrier();
+				return _baseConfiguration = xmldoc;
+			}
+			set
+			{
+				if(value == null)
+					throw new ArgumentNullException(nameof(value));
+				AssertNotUsedUp();
+				_baseConfiguration = value;
 			}
 		}
 
