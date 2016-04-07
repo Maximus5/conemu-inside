@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>ConEmu.Control.WinForms</id>
-    <version>1.0.20160313.1</version> <!-- 1.0, because Nuget only upgrades automatically with the same first components, so probably shan't keep the date in them. -->
+    <version>1.0.20160407.0</version> <!-- 1.0, because Nuget only upgrades automatically with the same first components, so probably shan't keep the date in them. -->
     <title>ConEmu Console Emulator — Windows Forms Control Embedding</title>
     <authors>Maximus5,hypersw</authors>
     <owners>Maximus5,hypersw</owners>
