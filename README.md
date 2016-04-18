@@ -9,6 +9,19 @@ ConEmu build 151201 or higher is required.
 ![ConEmu Inside](https://github.com/Maximus5/conemu-inside/wiki/ConEmu-Inside.png)
 
 
+## Solution's projects
+
+Solution `ConEmuInside.sln` contains several projects.
+
+* ConEmuInside: Example, how you may run (directly) `ConEmu.exe` to embed it
+  into your application.
+* ConEmuWinForms: Source for nuget package
+  [ConEmu.Control.WinForms](https://www.nuget.org/packages/ConEmu.Control.WinForms/).
+* ConsoleUtilityShowcase: An example how to use
+  [ConEmu.Control.WinForms](https://www.nuget.org/packages/ConEmu.Control.WinForms/).
+* ControlDllTestbed: For testing...
+
+
 ## License (BSD 3-clause)
 
     Copyright (c) 2015, Maximus5 <ConEmu.Maximus5@gmail.com>
