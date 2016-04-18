@@ -114,7 +114,7 @@ namespace ConEmuInside
                     lsConEmuExe = ConEmu.Modules[0].FileName;
                     bExeLoaded = true;
                 }
-                catch (System.ComponentModel.Win32Exception e)
+                catch (System.ComponentModel.Win32Exception)
                 {
                     Thread.Sleep(50);
                 }

@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<key name="Software">
+	<key name="ConEmu">
+		<key name=".Vanilla" modified="2015-12-01 17:14:51" build="151129">
+			<value name="StartType" type="hex" data="02"/>
+			<value name="StartTasksName" type="string" data="{Shells::cmd}"/>
+			<value name="Tabs" type="hex" data="00"/>
+			<value name="SingleInstance" type="hex" data="00"/>
+			<value name="KeyboardHooks" type="hex" data="01"/>
+			<value name="UseInjects" type="hex" data="01"/>
+			<value name="Update.CheckOnStartup" type="hex" data="00"/>
+			<value name="Update.CheckHourly" type="hex" data="00"/>
+			<value name="Update.ConfirmDownload" type="hex" data="01"/>
+			<value name="Update.UseBuilds" type="hex" data="02"/>
+			<value name="FontUseDpi" type="hex" data="01"/>
+			<value name="FontUseUnits" type="hex" data="01"/>
+			<value name="FontSize" type="dword" data="0000000c"/>
+			<value name="StatusFontHeight" type="dword" data="0000000c"/>
+			<value name="TabFontHeight" type="dword" data="0000000d"/>
+			<value name="StartCreateDelay" type="dword" data="00000064"/>
+			<value name="CursorTypeActive" type="dword" data="000232c1"/>
+			<value name="CursorTypeInactive" type="dword" data="00823283"/>
+			<value name="TrueColorerSupport" type="hex" data="01"/>
+			<value name="FadeInactive" type="hex" data="01"/>
+			<value name="FadeInactiveLow" type="hex" data="00"/>
+			<value name="FadeInactiveHigh" type="hex" data="d0"/>
+			<value name="ConVisible" type="hex" data="00"/>
+			<value name="ProcessAnsi" type="hex" data="01"/>
+			<value name="ProcessCmdStart" type="hex" data="00"/>
+			<value name="SuppressBells" type="hex" data="01"/>
+			<value name="SaveCmdHistory" type="hex" data="00"/>
+			<value name="Multi" type="hex" data="00"/>
+			<value name="FontName" type="string" data="Consolas"/>
+			<value name="FontName2" type="string" data="Lucida Console"/>
+			<value name="FontAutoSize" type="hex" data="00"/>
+			<value name="FontSizeX" type="dword" data="00000000"/>
+			<value name="FontSizeX2" type="dword" data="00000000"/>
+			<value name="FontSizeX3" type="dword" data="00000000"/>
+			<value name="FontCharSet" type="hex" data="cc"/>
+			<value name="Anti-aliasing" type="dword" data="00000006"/>
+			<value name="FontBold" type="hex" data="00"/>
+			<value name="FontItalic" type="hex" data="00"/>
+			<value name="UseCurrentSizePos" type="hex" data="00"/>
+			<value name="AutoSaveSizePos" type="hex" data="00"/>
+			<value name="Cascaded" type="hex" data="00"/>
+			<value name="EnvironmentSet" type="multi">
+				<line data="chcp utf-8"/>
+			</value>
+			<value name="CTS.Intelligent" type="hex" data="01"/>
+			<value name="CTS.IntelligentExceptions" type="string" data="far|vim"/>
+			<value name="CTS.AutoCopy" type="hex" data="01"/>
+			<value name="CTS.IBeam" type="hex" data="01"/>
+			<value name="CTS.EndOnTyping" type="hex" data="00"/>
+			<value name="CTS.EndOnKeyPress" type="hex" data="00"/>
+			<value name="CTS.Freeze" type="hex" data="00"/>
+			<value name="CTS.SelectBlock" type="hex" data="01"/>
+			<value name="CTS.SelectText" type="hex" data="01"/>
+			<value name="CTS.HtmlFormat" type="hex" data="00"/>
+			<value name="CTS.ForceLocale" type="dword" data="00000419"/>
+			<value name="CTS.ActMode" type="hex" data="02"/>
+			<value name="CTS.RBtnAction" type="hex" data="03"/>
+			<value name="CTS.MBtnAction" type="hex" data="00"/>
+			<value name="CTS.ColorIndex" type="hex" data="e0"/>
+			<value name="ClipboardConfirmEnter" type="hex" data="01"/>
+			<value name="ClipboardConfirmLonger" type="dword" data="000000c8"/>
+			<value name="FarGotoEditorOpt" type="hex" data="01"/>
+			<value name="FarGotoEditorPath" type="string" data="far.exe /e%1:%2 &quot;%3&quot;"/>
+			<value name="HighlightMouseRow" type="hex" data="00"/>
+			<value name="HighlightMouseCol" type="hex" data="00"/>
+			<value name="FixFarBorders" type="hex" data="00"/>
+			<value name="FixFarBordersRanges" type="string" data="2013-25C4;"/>
+			<value name="ExtendUCharMap" type="hex" data="01"/>
+			<value name="EnhanceGraphics" type="hex" data="01"/>
+			<value name="EnhanceButtons" type="hex" data="00"/>
+			<value name="PartBrush75" type="hex" data="c8"/>
+			<value name="PartBrush50" type="hex" data="96"/>
+			<value name="PartBrush25" type="hex" data="5a"/>
+			<value name="PartBrushBlack" type="hex" data="20"/>
+			<value name="RightClick opens context menu" type="hex" data="02"/>
+			<value name="RightClickMacro2" type="string" data=""/>
+			<value name="SendAltTab" type="hex" data="00"/>
+			<value name="SendAltEsc" type="hex" data="00"/>
+			<value name="SendAltPrintScrn" type="hex" data="00"/>
+			<value name="SendPrintScrn" type="hex" data="00"/>
+			<value name="SendCtrlEsc" type="hex" data="00"/>
+			<value name="Min2Tray" type="hex" data="00"/>
+			<value name="AlwaysShowTrayIcon" type="hex" data="00"/>
+			<value name="SafeFarClose" type="hex" data="01"/>
+			<value name="SafeFarCloseMacro" type="string" data=""/>
+			<value name="FARuseASCIIsort" type="hex" data="00"/>
+			<value name="ShellNoZoneCheck" type="hex" data="00"/>
+			<value name="FixAltOnAltTab" type="hex" data="00"/>
+			<value name="DisableMouse" type="hex" data="00"/>
+			<value name="RSelectionFix" type="hex" data="01"/>
+			<value name="MouseSkipActivation" type="hex" data="01"/>
+			<value name="MouseSkipMoving" type="hex" data="01"/>
+			<value name="StatusBar.Show" type="hex" data="01"/>
+			<value name="StatusBar.Flags" type="dword" data="00000002"/>
+			<value name="StatusFontFace" type="string" data="Segoe UI"/>
+			<value name="StatusFontCharSet" type="dword" data="00000000"/>
+			<value name="StatusBar.Color.Back" type="dword" data="00423607"/>
+			<value name="StatusBar.Color.Light" type="dword" data="00e3f6fd"/>
+			<value name="StatusBar.Color.Dark" type="dword" data="00a1a193"/>
+			<value name="StatusBar.Hide.VCon" type="hex" data="01"/>
+			<value name="StatusBar.Hide.CapsL" type="hex" data="01"/>
+			<value name="StatusBar.Hide.NumL" type="hex" data="01"/>
+			<value name="StatusBar.Hide.ScrL" type="hex" data="01"/>
+			<value name="StatusBar.Hide.VisL" type="hex" data="01"/>
+			<value name="StatusBar.Hide.Lang" type="hex" data="01"/>
+			<value name="StatusBar.Hide.KeyHooks" type="hex" data="00"/>
+			<value name="StatusBar.Hide.WPos" type="hex" data="01"/>
+			<value name="StatusBar.Hide.WSize" type="hex" data="01"/>
+			<value name="StatusBar.Hide.WClient" type="hex" data="01"/>
+			<value name="StatusBar.Hide.WWork" type="hex" data="01"/>
+			<value name="StatusBar.Hide.WVBack" type="hex" data="01"/>
+			<value name="StatusBar.Hide.WVDC" type="hex" data="01"/>
+			<value name="StatusBar.Hide.Style" type="hex" data="01"/>
+			<value name="StatusBar.Hide.StyleEx" type="hex" data="01"/>
+			<value name="StatusBar.Hide.hFore" type="hex" data="01"/>
+			<value name="StatusBar.Hide.hFocus" type="hex" data="01"/>
+			<value name="StatusBar.Hide.Zoom" type="hex" data="01"/>
+			<value name="StatusBar.Hide.Dpi" type="hex" data="01"/>
+			<value name="StatusBar.Hide.ABuf" type="hex" data="01"/>
+			<value name="StatusBar.Hide.CPos" type="hex" data="01"/>
+			<value name="StatusBar.Hide.CSize" type="hex" data="01"/>
+			<value name="StatusBar.Hide.BSize" type="hex" data="01"/>
+			<value name="StatusBar.Hide.CurX" type="hex" data="01"/>
+			<value name="StatusBar.Hide.CurY" type="hex" data="01"/>
+			<value name="StatusBar.Hide.CurS" type="hex" data="01"/>
+			<value name="StatusBar.Hide.CurI" type="hex" data="00"/>
+			<value name="StatusBar.Hide.ConEmuPID" type="hex" data="00"/>
+			<value name="StatusBar.Hide.ConEmuHWND" type="hex" data="01"/>
+			<value name="StatusBar.Hide.ConEmuView" type="hex" data="01"/>
+			<value name="StatusBar.Hide.Srv" type="hex" data="00"/>
+			<value name="StatusBar.Hide.SrvHWND" type="hex" data="01"/>
+			<value name="StatusBar.Hide.Transparency" type="hex" data="01"/>
+			<value name="StatusBar.Hide.New" type="hex" data="01"/>
+			<value name="StatusBar.Hide.Sync" type="hex" data="01"/>
+			<value name="StatusBar.Hide.Proc" type="hex" data="00"/>
+			<value name="StatusBar.Hide.Title" type="hex" data="00"/>
+			<value name="StatusBar.Hide.Time" type="hex" data="01"/>
+			<value name="StatusBar.Hide.Resize" type="hex" data="01"/>
+			<value name="TryToCenter" type="hex" data="01"/>
+			<value name="CenterConsolePad" type="dword" data="00000005"/>
+			<value name="ShowScrollbar" type="hex" data="01"/>
+			<value name="SleepInBackground" type="hex" data="00"/>
+			<value name="IntegralSize" type="hex" data="00"/>
+			<value name="WindowMode" type="dword" data="0000051f"/>
+			<value name="ConWnd X" type="dword" data="00000000"/>
+			<value name="ConWnd Y" type="dword" data="00000000"/>
+			<value name="LastMonitor" type="string" data="0,0,1671,1080"/>
+			<value name="ConWnd Width" type="dword" data="0000004d"/>
+			<value name="ConWnd Height" type="dword" data="00000012"/>
+			<value name="16bit Height" type="dword" data="00000000"/>
+		</key>
+	</key>
+</key>
