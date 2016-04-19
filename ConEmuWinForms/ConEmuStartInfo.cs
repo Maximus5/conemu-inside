@@ -31,6 +31,9 @@ namespace ConEmu.WinForms
 		[CanBeNull]
 		private EventHandler<ConsoleProcessExitedEventArgs> _evtConsoleProcessExitedEventSink;
 
+		[CanBeNull]
+		private EventHandler<ConsoleProcessExitedEventArgs> _evtConsoleProcessPreExitedEventSink;
+
 		private bool _isEchoingConsoleCommandLine;
 
 		private bool _isElevated;
@@ -261,6 +264,22 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
+		///   Fired before the <see cref="ConsoleProcessExitedEventSink"/>
+		/// </summary>
+		[CanBeNull]
+		internal EventHandler<ConsoleProcessExitedEventArgs> ConsoleProcessPreExitedEventSink
+		{
+			get
+			{
+				return _evtConsoleProcessPreExitedEventSink;
+			}
+			set
+			{
+				AssertNotUsedUp();
+				_evtConsoleProcessPreExitedEventSink = value;
+			}
+		}
+		/// </summary>
 		///     <para>Gets or sets the custom greeting text which will be echoed into the console emulator stdout before the <see cref="ConsoleProcessCommandLine" /> starts executing.</para>
 		///     <para>Note that to echo the <see cref="ConsoleProcessCommandLine" /> itself you can use the more specific <see cref="IsEchoingConsoleCommandLine" /> option (which prints after the custom greeting text).</para>
 		///     <para>Newline handling: a newline is added automatically at the end, if missing; if there's a single newline at the end, it is retained AS IS. If you want an empty line after text, add a double newline.</para>

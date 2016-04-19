@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -402,6 +402,7 @@ namespace ConEmu.WinForms
 		///     <para>If you're reading the ANSI log with <see cref="AnsiStreamChunkReceived" />, it's guaranteed that all the events for the log will be fired before <see cref="ConsoleProcessExited" />, and there will be no events afterwards.</para>
 		/// </summary>
 		public event EventHandler<ConsoleProcessExitedEventArgs> ConsoleProcessExited;
+		public event EventHandler<ConsoleProcessExitedEventArgs> ConsoleProcessPreExited;
 
 		[NotNull]
 		private AnsiLog Init_AnsiLog([NotNull] ConEmuStartInfo startinfo)
@@ -766,11 +767,15 @@ namespace ConEmu.WinForms
 			// Advise events before they got chance to fire, use event sinks from startinfo for guaranteed delivery
 			if(startinfo.ConsoleProcessExitedEventSink != null)
 				ConsoleProcessExited += startinfo.ConsoleProcessExitedEventSink;
+ 	 	 	if (startinfo.ConsoleProcessPreExitedEventSink != null)
+ 	 	 	{
+ 	 	 	 	ConsoleProcessPreExited += startinfo.ConsoleProcessPreExitedEventSink;
+ 	 	 	}
 			if(startinfo.ConsoleEmulatorClosedEventSink != null)
 				ConsoleEmulatorClosed += startinfo.ConsoleEmulatorClosedEventSink;
 
 			// Re-issue events as async tasks
-			// As we advise events before they even fire, the task is guaranteed to get its state
+ 	 	 	// As we advise events before they even fire, the task is guaranteed to get its state
 			ConsoleProcessExited += (sender, args) => _taskConsoleProcessExit.SetResult(args);
 			ConsoleEmulatorClosed += delegate { _taskConsoleEmulatorClosed.SetResult(Missing.Value); };
 		}
@@ -800,7 +805,8 @@ namespace ConEmu.WinForms
 			// Store exit code
 			_nConsoleProcessExitCode = nConsoleProcessExitCode;
 
-			// Notify user
+ 	 	 	// Notify user
+ 	 	 	ConsoleProcessPreExited?.Invoke(this, new ConsoleProcessExitedEventArgs(nConsoleProcessExitCode));
 			ConsoleProcessExited?.Invoke(this, new ConsoleProcessExitedEventArgs(nConsoleProcessExitCode));
 		}
 
