@@ -97,10 +97,23 @@ namespace ControlDllTestbed
 				if(result == DialogResult.Cancel)
 					return;
 				ConEmuSession session = conemu.Start(new ConEmuStartInfo() {ConsoleProcessCommandLine = "choice", IsEchoingConsoleCommandLine = true, WhenConsoleProcessExits = result == DialogResult.Yes ? WhenConsoleProcessExits.KeepConsoleEmulatorAndShowMessage : WhenConsoleProcessExits.CloseConsoleEmulator, ConsoleProcessExitedEventSink = (sender, args) => MessageBox.Show($"Your choice is {args.ExitCode} (powered by startinfo event sink).")});
-				session.WaitForConsoleProcessExitAsync().ContinueWith(task => MessageBox.Show($"Your choice is {task.Result.ExitCode} (powered by wait-for-exit-async)."));
+#pragma warning disable 4014
+				ShowMessageForChoiceAsync(session);
+#pragma warning restore 4014
 			};
 
 			return form;
+		}
+
+		/// <summary>
+		/// This method checks that the async-await compiler syntax is not prevented in netfx45+ projects due to the shim types present in the conemu assembly (https://github.com/Maximus5/conemu-inside/issues/20).
+		/// </summary>
+		private static async Task ShowMessageForChoiceAsync(ConEmuSession session)
+		{
+			if(session == null)
+				throw new ArgumentNullException(nameof(session));
+			ConsoleProcessExitedEventArgs exitargs = await session.WaitForConsoleProcessExitAsync();
+			MessageBox.Show($"Your choice is {exitargs.ExitCode} (powered by wait-for-exit-async).");
 		}
 	}
 }

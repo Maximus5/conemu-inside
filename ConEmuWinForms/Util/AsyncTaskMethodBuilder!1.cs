@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace System.Runtime.CompilerServices
 {
-	public struct AsyncTaskMethodBuilder<TResult>
+	internal struct AsyncTaskMethodBuilder<TResult>
 	{
 		private TaskCompletionSource<TResult> _tasker;
 

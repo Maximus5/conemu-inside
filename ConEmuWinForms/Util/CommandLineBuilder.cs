@@ -17,7 +17,7 @@ namespace Microsoft.Build.Utilities
 	/// 	-- Functional double quotes (for example to handle spaces) are best put around both name and value
 	/// 	    in switches like /Dname=value.
 	/// </summary> 
-	public sealed class CommandLineBuilder
+	internal sealed class CommandLineBuilder
     {
 		public static readonly string License = 
 @"

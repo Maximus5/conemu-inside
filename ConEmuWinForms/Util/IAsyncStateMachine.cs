@@ -3,7 +3,7 @@
 
 namespace System.Runtime.CompilerServices
 {
-	public interface IAsyncStateMachine
+	internal interface IAsyncStateMachine
 	{
 		void MoveNext();
 
