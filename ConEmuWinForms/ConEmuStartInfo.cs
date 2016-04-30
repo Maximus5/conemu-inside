@@ -77,6 +77,7 @@ namespace ConEmu.WinForms
 		{
 			if(sConsoleProcessCommandLine == null)
 				throw new ArgumentNullException(nameof(sConsoleProcessCommandLine));
+			ConsoleProcessCommandLine = sConsoleProcessCommandLine;
 		}
 
 		/// <summary>
@@ -237,6 +238,8 @@ namespace ConEmu.WinForms
 			}
 			set
 			{
+				if(value == null)
+					throw new ArgumentNullException(nameof(value));
 				AssertNotUsedUp();
 				_sConsoleProcessCommandLine = value;
 			}
