@@ -594,6 +594,7 @@ namespace ConEmu.WinForms
 			dirForConfigFile.Create();
 			string sConfigFile = Path.Combine(dirForConfigFile.FullName, "Config.Xml");
 			xmldoc.Save(sConfigFile);
+			new FileInfo(sConfigFile).IsReadOnly = true; // Mark the file as readonly, so that ConEmu didn't suggest to save modifications to this temp file
 
 			return sConfigFile;
 		}
