@@ -729,6 +729,7 @@ namespace ConEmu.WinForms
 
 				if(!processNew.Start())
 					throw new Win32Exception("The process did not start.");
+				Application.Exit();
 				return processNew;
 			}
 			catch(Win32Exception ex)
