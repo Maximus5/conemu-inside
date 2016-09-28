@@ -51,6 +51,9 @@ namespace ConEmu.WinForms
 		[NotNull]
 		private string _sConsoleProcessCommandLine = ConEmuConstants.DefaultConsoleCommandLine;
 
+		[CanBeNull]
+		private string _sConsoleProcessExtraArgs;
+
 		[NotNull]
 		private string _sGreetingText = "";
 
@@ -242,6 +245,24 @@ namespace ConEmu.WinForms
 					throw new ArgumentNullException(nameof(value));
 				AssertNotUsedUp();
 				_sConsoleProcessCommandLine = value;
+			}
+		}
+
+		/// <summary>
+		///     <para>Additional arguments to be passed to the console emulator.</para>
+		///     <para>This property cannot be changed when the process is running.</para>
+		/// </summary>
+		[CanBeNull]
+		public string ConsoleProcessExtraArgs
+		{
+			get
+			{
+				return _sConsoleProcessExtraArgs;
+			}
+			set
+			{
+				AssertNotUsedUp();
+				_sConsoleProcessExtraArgs = value;
 			}
 		}
 
