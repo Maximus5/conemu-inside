@@ -535,7 +535,7 @@ namespace ConEmu.WinForms
 				xmlSoftware.AppendChild(xmlConEmu = xmldoc.CreateElement(ConEmuConstants.XmlElementKey));
 				xmlConEmu.SetAttribute(ConEmuConstants.XmlAttrName, ConEmuConstants.XmlValueConEmu);
 			}
-			var xmlDotVanilla = xmlSoftware.SelectSingleNode($"{ConEmuConstants.XmlElementKey}[@{ConEmuConstants.XmlAttrName}='{ConEmuConstants.XmlValueDotVanilla}']") as XmlElement;
+			var xmlDotVanilla = xmlConEmu.SelectSingleNode($"{ConEmuConstants.XmlElementKey}[@{ConEmuConstants.XmlAttrName}='{ConEmuConstants.XmlValueDotVanilla}']") as XmlElement;
 			if(xmlDotVanilla == null)
 			{
 				xmlConEmu.AppendChild(xmlDotVanilla = xmldoc.CreateElement(ConEmuConstants.XmlElementKey));
