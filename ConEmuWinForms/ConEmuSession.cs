@@ -496,6 +496,11 @@ namespace ConEmu.WinForms
 			}
 			cmdl.AppendSwitchIfNotNull("-cur_console:", $"{(startinfo.IsElevated ? "a" : "")}{sConsoleExitMode}");
 
+			if (!string.IsNullOrEmpty(startinfo.ConsoleProcessExtraArgs))
+			{
+				cmdl.AppendSwitch(startinfo.ConsoleProcessExtraArgs);
+			}
+
 			// And the shell command line itself
 			cmdl.AppendSwitch(startinfo.ConsoleProcessCommandLine);
 
