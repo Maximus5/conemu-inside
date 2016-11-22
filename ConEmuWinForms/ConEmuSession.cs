@@ -180,8 +180,8 @@ namespace ConEmu.WinForms
 			try
 			{
 				if(!_process.HasExited)
-					BeginGuiMacro("Close").WithParam(1 /*terminate active process*/).WithParam(1 /*without confirmation*/).ExecuteSync();
-				if(!_process.HasExited)
+                    Thread.Sleep(10);
+                if (!_process.HasExited)
 					_process.Kill();
 			}
 			catch(Exception)
