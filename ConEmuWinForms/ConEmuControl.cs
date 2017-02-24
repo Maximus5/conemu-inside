@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
 using System.Runtime.InteropServices;
@@ -155,27 +155,32 @@ namespace ConEmu.WinForms
 			var session = new ConEmuSession(startinfo, new ConEmuSession.HostContext((void*)Handle, IsStatusbarVisible));
 			_running = session;
 			StateChanged?.Invoke(this, EventArgs.Empty);
-
+ 	 	 	startinfo.ConsoleProcessPreExitedEventSink += (sender, args) => OnSessionEnds();
 			// Wait for its exit
 			session.WaitForConsoleEmulatorCloseAsync().ContinueWith(scheduler : TaskScheduler.FromCurrentSynchronizationContext(), continuationAction : task =>
 			{
-				try
-				{
-					_nLastExitCode = _running.GetConsoleProcessExitCode();
-				}
-				catch(Exception)
-				{
-					// NOP
-				}
-				_running = null;
-				Invalidate();
-				StateChanged?.Invoke(this, EventArgs.Empty);
+				OnSessionEnds();
 			});
 
 			return session;
 		}
 
-		[SuppressMessage("ReSharper", "UnusedMember.Local")]
+ 	 	private void OnSessionEnds()
+ 	 	{
+ 	 	 	try
+ 	 	 	{
+ 	 	 	 	_nLastExitCode = _running.GetConsoleProcessExitCode();
+ 	 	 	}
+ 	 	 	catch (Exception)
+ 	 	 	{
+ 	 	 	 	// NOP
+ 	 	 	}
+ 	 	 	_running = null;
+ 	 	 	Invalidate();
+ 	 	 	StateChanged?.Invoke(this, EventArgs.Empty);
+ 	 	}
+
+ 	 	[SuppressMessage("ReSharper", "UnusedMember.Local")]
 		private void AssertNotRunning()
 		{
 			if(_running != null)
