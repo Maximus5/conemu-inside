@@ -502,7 +502,7 @@ namespace ConEmu.WinForms
 			}
 
 			// And the shell command line itself
-			cmdl.AppendSwitch(startinfo.ConsoleProcessCommandLine);
+			cmdl.AppendSwitch("\"" + startinfo.ConsoleProcessCommandLine + "\"");
 
 			return cmdl;
 		}
