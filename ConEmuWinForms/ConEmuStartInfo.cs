@@ -35,6 +35,8 @@ namespace ConEmu.WinForms
 
 		private bool _isElevated;
 
+		private bool _isLog;
+
 		private bool _isReadingAnsiStream;
 
 		private bool _isUsedUp;
@@ -319,6 +321,24 @@ namespace ConEmu.WinForms
 			{
 				AssertNotUsedUp();
 				_isElevated = value;
+			}
+		}
+
+		/// <summary>
+		///     <para>Gets or sets whether the ConEmu will write some diagnostics into LogFiles.</para>
+		///     <para>The default is <c>False</c>.</para>
+		///     <para>This property cannot be changed when the process is running.</para>
+		/// </summary>
+		public bool IsLog
+		{
+			get
+			{
+				return _isLog;
+			}
+			set
+			{
+				AssertNotUsedUp();
+				_isLog = value;
 			}
 		}
 

@@ -454,6 +454,9 @@ namespace ConEmu.WinForms
 			// Don't use keyboard hooks in ConEmu when embedded
 			cmdl.AppendSwitch("-NoKeyHooks");
 
+			if (startinfo.IsLog)
+				cmdl.AppendSwitch("-Log");
+
 			// Basic settings, like fonts and hidden tab bar
 			// Plus some of the properties on this class
 			cmdl.AppendSwitch("-LoadCfgFile");
