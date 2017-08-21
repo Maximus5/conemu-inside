@@ -35,7 +35,34 @@ namespace ConEmu.WinForms
 
 		private bool _isElevated;
 
-		private bool _isLog;
+		/// <summary>
+		/// LogLevels: Empty, NotStarted, Running, Exited.
+		/// </summary>
+		public enum LogLevels
+		{
+			/// <summary>
+			/// Logging is disabled.
+			/// </summary>
+			Disabled,
+			/// <summary>
+			/// Initial logging level, recommended. Implies switch "-Log".
+			/// </summary>
+			Basic,
+			/// <summary>
+			/// More data would be logging. Implies switch "-Log2".
+			/// </summary>
+			Detailed,
+			/// <summary>
+			/// Almost Full logging level. Implies switch "-Log3".
+			/// </summary>
+			Advanced,
+			/// <summary>
+			/// Maximum logging level. Implies switch "-Log4".
+			/// </summary>
+			Full
+		};
+
+		private LogLevels _logLevel;
 
 		private bool _isReadingAnsiStream;
 
@@ -325,20 +352,21 @@ namespace ConEmu.WinForms
 		}
 
 		/// <summary>
-		///     <para>Gets or sets whether the ConEmu will write some diagnostics into LogFiles.</para>
-		///     <para>The default is <c>False</c>.</para>
+		///     <para>Gets or sets whether the ConEmu will write some diagnostics into <see href="https://conemu.github.io/en/LogFiles.html">LogFiles</see>.</para>
+		///     <para>LogFiles are created in ConEmu program folder if it's write-enabled, otherwise they would be placed in Desktop folder <c>ConEmuLogs</c>.</para>
+		///     <para>The default is <c>Disabled</c>.</para>
 		///     <para>This property cannot be changed when the process is running.</para>
 		/// </summary>
-		public bool IsLog
+		public LogLevels LogLevel
 		{
 			get
 			{
-				return _isLog;
+				return _logLevel;
 			}
 			set
 			{
 				AssertNotUsedUp();
-				_isLog = value;
+				_logLevel = value;
 			}
 		}
 
