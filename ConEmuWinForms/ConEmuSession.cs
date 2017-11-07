@@ -454,6 +454,18 @@ namespace ConEmu.WinForms
 			// Don't use keyboard hooks in ConEmu when embedded
 			cmdl.AppendSwitch("-NoKeyHooks");
 
+			switch (startinfo.LogLevel)
+			{
+				case ConEmuStartInfo.LogLevels.Basic:
+					cmdl.AppendSwitch("-Log"); break;
+				case ConEmuStartInfo.LogLevels.Detailed:
+					cmdl.AppendSwitch("-Log2"); break;
+				case ConEmuStartInfo.LogLevels.Advanced:
+					cmdl.AppendSwitch("-Log3"); break;
+				case ConEmuStartInfo.LogLevels.Full:
+					cmdl.AppendSwitch("-Log4"); break;
+			}
+
 			// Basic settings, like fonts and hidden tab bar
 			// Plus some of the properties on this class
 			cmdl.AppendSwitch("-LoadCfgFile");

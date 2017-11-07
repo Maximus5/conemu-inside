@@ -39,7 +39,11 @@ namespace ConsoleUtilityShowcase
 			ConEmuControl conemu;
 			var sbText = new StringBuilder();
 			stack.Controls.Add(conemu = new ConEmuControl() {AutoStartInfo = null, MinimumSize = new Size(800, 600), Dock = DockStyle.Top});
-			ConEmuSession session = conemu.Start(new ConEmuStartInfo() {AnsiStreamChunkReceivedEventSink = (sender, args) => sbText.Append(args.GetMbcsText()), ConsoleProcessCommandLine = "ping 8.8.8.8"});
+			ConEmuSession session = conemu.Start(new ConEmuStartInfo() {
+				AnsiStreamChunkReceivedEventSink = (sender, args) => sbText.Append(args.GetMbcsText()),
+				ConsoleProcessCommandLine = "ping 8.8.8.8",
+				LogLevel = ConEmuStartInfo.LogLevels.Basic
+			});
 			session.ConsoleProcessExited += delegate
 			{
 				Match match = Regex.Match(sbText.ToString(), @"\(.*\b(?<pc>\d+)%.*?\)", RegexOptions.Multiline);
