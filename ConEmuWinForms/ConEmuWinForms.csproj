@@ -8,7 +8,7 @@
     <OutputType>Library</OutputType>
     <RootNamespace>ConEmu.WinForms</RootNamespace>
     <AssemblyName>ConEmu.WinForms</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
     <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Default|AnyCPU' ">
@@ -61,7 +61,6 @@
     </Compile>
     <Compile Include="States.cs" />
     <Compile Include="Util\CommandLineBuilder.cs" />
-    <Compile Include="Util\TaskHelpers.cs" />
     <Compile Include="Util\WinApi.cs" />
     <Compile Include="WhenConsoleProcessExits.cs" />
   </ItemGroup>

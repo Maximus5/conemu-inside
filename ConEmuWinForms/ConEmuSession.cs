@@ -295,7 +295,7 @@ namespace ConEmu.WinForms
 			{
 				// Might be a race, so in between HasExited and Kill state could change, ignore possible errors here
 			}
-			return TaskHelpers.CompletedTask;
+			return Task.CompletedTask;
 		}
 
 		/// <summary>
@@ -313,7 +313,7 @@ namespace ConEmu.WinForms
 			{
 				// Might be a race, so in between HasExited and Kill state could change, ignore possible errors here
 			}
-			return TaskHelpers.CompletedTask;
+			return Task.CompletedTask;
 		}
 
 		/// <summary>
@@ -345,7 +345,7 @@ namespace ConEmu.WinForms
 			if(text == null)
 				throw new ArgumentNullException(nameof(text));
 			if(text.Length == 0)
-				return TaskHelpers.CompletedTask;
+				return Task.CompletedTask;
 
 			return BeginGuiMacro("Paste").WithParam(2).WithParam(text).ExecuteAsync();
 		}
@@ -359,7 +359,7 @@ namespace ConEmu.WinForms
 			if(text == null)
 				throw new ArgumentNullException(nameof(text));
 			if(text.Length == 0)
-				return TaskHelpers.CompletedTask;
+				return Task.CompletedTask;
 
 			return BeginGuiMacro("Write").WithParam(text).ExecuteAsync();
 		}
