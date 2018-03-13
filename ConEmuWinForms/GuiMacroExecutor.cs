@@ -54,7 +54,7 @@ namespace ConEmu.WinForms
 
 			// Bring the call on another thread, because placing the call on the same thread as ConEmu might cause a deadlock when it's still in the process of initialization
 			// (the GuiMacro stuff was designed for out-of-process comm and would blocking-wait for init to complete)
-			return Task.Factory.StartNew(() =>
+			return Task.Run(() =>
 			{
 				lock(_lock) // Don't allow unloading in parallel
 				{
@@ -104,7 +104,7 @@ namespace ConEmu.WinForms
 
 			try
 			{
-				Task<Task<GuiMacroResult>> taskStart = Task.Factory.StartNew(() =>
+				Task<GuiMacroResult> taskStart = Task.Run(() =>
 				{
 					var processExtender = new Process() {StartInfo = new ProcessStartInfo(sConEmuConsoleExtenderExecutablePath, cmdl.ToString()) {WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true, UseShellExecute = false}};
 
@@ -135,7 +135,7 @@ namespace ConEmu.WinForms
 					return taskresult.Task;
 				});
 
-				return taskStart.Unwrap();
+				return taskStart;
 			}
 			catch(Exception ex)
 			{

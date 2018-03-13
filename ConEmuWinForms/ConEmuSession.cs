@@ -19,6 +19,7 @@ using ConEmu.WinForms.Util;
 using JetBrains.Annotations;
 
 using Microsoft.Build.Utilities;
+using Microsoft.VisualStudio.Threading;
 
 using Timer = System.Windows.Forms.Timer;
 
@@ -71,10 +72,11 @@ namespace ConEmu.WinForms
 		private readonly Process _process;
 
 		/// <summary>
-		/// Stores the main thread scheduler, so that all state properties were only changed on this thread.
+		/// Stores the joinable task factory used for executing work on the main thread, so that all state properties
+		/// were only changed on this thread.
 		/// </summary>
 		[NotNull]
-		private readonly TaskScheduler _schedulerSta = TaskScheduler.FromCurrentSynchronizationContext();
+		private readonly JoinableTaskFactory _joinableTaskFactory;
 
 		/// <summary>
 		/// The original parameters for this session; sealed, so they can't change after the session is run.
@@ -100,15 +102,19 @@ namespace ConEmu.WinForms
 		/// </summary>
 		/// <param name="startinfo">User-defined startup parameters for the console process.</param>
 		/// <param name="hostcontext">Control-related parameters.</param>
-		public ConEmuSession([NotNull] ConEmuStartInfo startinfo, [NotNull] HostContext hostcontext)
+		/// <param name="joinableTaskFactory">The <see cref="JoinableTaskFactory"/>.</param>
+		public ConEmuSession([NotNull] ConEmuStartInfo startinfo, [NotNull] HostContext hostcontext, [NotNull] JoinableTaskFactory joinableTaskFactory)
 		{
 			if(startinfo == null)
 				throw new ArgumentNullException(nameof(startinfo));
 			if(hostcontext == null)
 				throw new ArgumentNullException(nameof(hostcontext));
+			if (joinableTaskFactory == null)
+				throw new ArgumentNullException(nameof(joinableTaskFactory));
 			if(string.IsNullOrEmpty(startinfo.ConsoleProcessCommandLine))
 				throw new InvalidOperationException($"Cannot start a new console process for command line “{startinfo.ConsoleProcessCommandLine}” because it's either NULL, or empty, or whitespace.");
 
+			_joinableTaskFactory = joinableTaskFactory;
 			_startinfo = startinfo;
 			startinfo.MarkAsUsedUp(); // No more changes allowed in this copy
 
@@ -217,22 +223,7 @@ namespace ConEmu.WinForms
 			if(macrotext == null)
 				throw new ArgumentNullException(nameof(macrotext));
 
-			Task<GuiMacroResult> task = ExecuteGuiMacroTextAsync(macrotext);
-
-			// No meaningful message pump on an MTA thread by contract, so can just do a blocking wait
-			if(Thread.CurrentThread.GetApartmentState() == ApartmentState.MTA)
-				return task.Result;
-
-			// On an STA thread we should be pumping
-			bool isThru = false;
-			task.ContinueWith(t => isThru = true);
-
-			while(!isThru)
-			{
-				Application.DoEvents();
-				Thread.Sleep(10);
-			}
-			return task.Result;
+			return _joinableTaskFactory.Run(() => ExecuteGuiMacroTextAsync(macrotext));
 		}
 
 		/// <summary>
@@ -340,7 +331,7 @@ namespace ConEmu.WinForms
 		///     <para>Writes text to the console input, as if it's been typed by user on the keyboard.</para>
 		///     <para>Whether this will be visible (=echoed) on screen is up to the running console process.</para>
 		/// </summary>
-		public Task WriteInputText([NotNull] string text)
+		public Task WriteInputTextAsync([NotNull] string text)
 		{
 			if(text == null)
 				throw new ArgumentNullException(nameof(text));
@@ -354,7 +345,7 @@ namespace ConEmu.WinForms
 		///     <para>Writes text to the console output, as if the current running console process has written it to stdout.</para>
 		///     <para>Use with caution, as this might interfere with console process output in an unpredictable manner.</para>
 		/// </summary>
-		public Task WriteOutputText([NotNull] string text)
+		public Task WriteOutputTextAsync([NotNull] string text)
 		{
 			if(text == null)
 				throw new ArgumentNullException(nameof(text));
@@ -426,15 +417,17 @@ namespace ConEmu.WinForms
 		private void Init_ConsoleProcessMonitoring()
 		{
 			// When the payload process exits, use its exit code
-			Action<Task<int?>> λExited = task =>
+			_joinableTaskFactory.RunAsync(async () =>
 			{
-				if(!task.Result.HasValue) // Means the wait were aborted, e.g. ConEmu has been shut down and we processed that on the main thread
-					return;
-				TryFireConsoleProcessExited(task.Result.Value);
-			};
+				// Detect when this happens
+				int? consoleProcessExitCode = await Init_PayloadProcessMonitoring_WaitForExitCodeAsync();
 
-			// Detect when this happens
-			Init_PayloadProcessMonitoring_WaitForExitCodeAsync().ContinueWith(λExited, _schedulerSta /* to the main thread*/);
+				await _joinableTaskFactory.SwitchToMainThreadAsync();
+
+				if(!consoleProcessExitCode.HasValue) // Means the wait were aborted, e.g. ConEmu has been shut down and we processed that on the main thread
+					return;
+				TryFireConsoleProcessExited(consoleProcessExitCode.Value);
+			});
 		}
 
 		[NotNull]
@@ -731,8 +724,10 @@ namespace ConEmu.WinForms
 				processNew.Exited += delegate
 				{
 					// Ensure STA
-					Task.Factory.StartNew(scheduler : _schedulerSta, cancellationToken : CancellationToken.None, creationOptions : 0, action : () =>
+					_joinableTaskFactory.RunAsync(async () =>
 					{
+						await _joinableTaskFactory.SwitchToMainThreadAsync();
+
 						// Tear down all objects
 						TerminateLifetime();
 
