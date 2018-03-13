@@ -81,7 +81,7 @@ namespace ConEmu.WinForms.Util
 			{
 				void* hProcess = OpenProcess(SYNCHRONIZE, 0, pid);
 				if(hProcess == null)
-					return TaskHelpers.FromResult(false);
+					return Task.FromResult(false);
 
 				var tasker = new TaskCompletionSource<bool>();
 
