@@ -15,7 +15,7 @@
 
 		/// <summary>
 		///     <para>When the console process exits, the console emulator stays open, and its window remains visible in the control, with all the console output text.</para>
-		///     <para>No additional message is written to the console output, but you can still use <see cref="ConEmuSession.WriteOutputText" /> to write any text.</para>
+		///     <para>No additional message is written to the console output, but you can still use <see cref="ConEmuSession.WriteOutputTextAsync" /> to write any text.</para>
 		///     <para>Pressing ESC or ENTER closes the console emulator, makes the control blank, and allows to run further <see cref="ConEmuSession">console emulator sessions</see> in this control.</para>
 		///     <para><see cref="ConEmuSession.ConsoleProcessExited" /> fires immediately, and <see cref="ConEmuSession.ConsoleEmulatorClosed" /> fires on user's ESC/ENTER, or when the console emulator is closed programmatically.</para>
 		/// </summary>
