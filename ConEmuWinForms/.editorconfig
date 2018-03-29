@@ -4,9 +4,13 @@
 root = false
 
 ; 1-tab indentation
-[*]
+[*.cs]
 indent_style = tab
 trim_trailing_whitespace = true
 
 [*.Designer.cs]
 trim_trailing_whitespace = false
+
+[*.{csproj,props,targets}]
+indent_style = space
+indent_size = 4
