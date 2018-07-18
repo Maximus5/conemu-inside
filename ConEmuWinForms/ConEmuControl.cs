@@ -143,7 +143,7 @@ namespace ConEmu.WinForms
 				_running = null;
 				Invalidate();
 				StateChanged?.Invoke(this, EventArgs.Empty);
-			});
+			}).Forget();
 
 			return session;
 		}
