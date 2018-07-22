@@ -790,7 +790,7 @@ namespace ConEmu.WinForms
 
 		private void TerminateLifetime()
 		{
-			List<Action> items = _lifetime;
+			List<Action> items = _lifetime.ToList();
 			_lifetime.Clear();
 			items.Reverse();
 			foreach(Action item in items)
