@@ -185,11 +185,10 @@ namespace ConEmu.WinForms
 		{
 			try
 			{
-				if (!_process.HasExited)
-				{
-					Thread.Sleep(10);
+				if(!_process.HasExited)
+                    Thread.Sleep(10);
+                if (!_process.HasExited)
 					_process.Kill();
-				}
 			}
 			catch(Exception)
 			{
