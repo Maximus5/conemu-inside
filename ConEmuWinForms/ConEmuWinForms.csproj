@@ -47,13 +47,16 @@
     <PackageReference Include="Microsoft.VisualStudio.Threading" Version="15.8.132" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\CommonAssemblyInfoExternals.cs">
+      <Link>Properties\CommonAssemblyInfoExternals.cs</Link>
+    </Compile>
     <Compile Include="AnsiLog.cs" />
     <Compile Include="AnsiStreamChunkEventArgs.cs" />
     <Compile Include="ConEmuConstants.cs" />
     <Compile Include="ConEmuControl.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="AssemblyInfo.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ConEmuSession.cs" />
     <Compile Include="ConEmuStartInfo.cs" />
     <Compile Include="GetInfoRoot.cs" />
