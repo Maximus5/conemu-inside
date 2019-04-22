@@ -10,6 +10,7 @@
     <RootNamespace>ConEmuInside</RootNamespace>
     <AssemblyName>ConEmuInside</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <RuntimeIdentifier>win</RuntimeIdentifier>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <TargetFrameworkProfile>Client</TargetFrameworkProfile>
