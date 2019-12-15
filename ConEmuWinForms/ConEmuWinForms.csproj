@@ -1,37 +1,13 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Default</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{1DC7D403-484B-43B4-B017-1356397A32CB}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <RootNamespace>ConEmu.WinForms</RootNamespace>
-    <AssemblyName>ConEmu.WinForms</AssemblyName>
-    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
-    <RuntimeIdentifier>win</RuntimeIdentifier>
-    <TargetFrameworkProfile />
-    <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Default|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
+    <TargetFramework>net461</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <NoWarn>1696;1591</NoWarn>
-    <DocumentationFile>bin\ConEmu.WinForms.Xml</DocumentationFile>
-    <PlatformTarget>AnyCPU</PlatformTarget>
+    <NoWarn>$(NoWarn),1573,1591,1696,1712</NoWarn>
+
+    <!-- TODO once all project migrated to SDK-style, remove this and move properties to Directory.Build.props -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
-  <PropertyGroup>
-    <SignAssembly>true</SignAssembly>
-  </PropertyGroup>
-  <PropertyGroup>
-    <AssemblyOriginatorKeyFile>Snk.Snk</AssemblyOriginatorKeyFile>
-  </PropertyGroup>
+  
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -40,51 +16,20 @@
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
   </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="ConEmu.Core" Version="19.7.14" PrivateAssets="all" />
-    <PackageReference Include="JetBrains.Annotations">
-      <Version>2018.2.1</Version>
-    </PackageReference>
+    <PackageReference Include="JetBrains.Annotations" Version="2018.2.1" />
     <PackageReference Include="Microsoft.VisualStudio.Threading" Version="15.8.132" />
   </ItemGroup>
+
   <ItemGroup>
-    <Compile Include="AnsiLog.cs" />
-    <Compile Include="AnsiStreamChunkEventArgs.cs" />
-    <Compile Include="ConEmuConstants.cs" />
-    <Compile Include="ConEmuControl.cs">
-      <SubType>Component</SubType>
-    </Compile>
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="ConEmuSession.cs" />
-    <Compile Include="ConEmuStartInfo.cs" />
-    <Compile Include="GetInfoRoot.cs" />
-    <Compile Include="GuiMacroExecutor.cs" />
-    <Compile Include="GuiMacroBuilder.cs" />
-    <Compile Include="GuiMacroResult.cs" />
-    <Compile Include="ConsoleProcessExitedEventArgs.cs" />
-    <Compile Include="Resources.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-      <DependentUpon>Resources.resx</DependentUpon>
-    </Compile>
-    <Compile Include="States.cs" />
-    <Compile Include="Util\CommandLineBuilder.cs" />
-    <Compile Include="Util\WinApi.cs" />
-    <Compile Include="WhenConsoleProcessExits.cs" />
+    <!-- Resources -->
+    <EmbeddedResource Update="Properties\Resources.resx" Generator="ResXFileCodeGenerator" LastGenOutput="Resources.Designer.cs" />
+    <Compile Update="Properties\Resources.Designer.cs" AutoGen="True" DependentUpon="Resources.resx" DesignTime="True" />
   </ItemGroup>
-  <ItemGroup>
-    <Content Include="ConEmu.xml" />
-    <None Include="Package.nuspec">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="Snk.Snk" />
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="Resources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-      <SubType>Designer</SubType>
-    </EmbeddedResource>
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+
+  <!-- Create a dummy Test target -->
+  <Target Name="Test" />
+
 </Project>
