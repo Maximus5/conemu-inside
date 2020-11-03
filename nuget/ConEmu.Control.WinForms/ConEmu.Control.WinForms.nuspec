@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>ConEmu.Control.WinForms</id>
+    <version>20.10.11</version>
+    <title>ConEmu Console Emulator — Windows Forms Control Embedding</title>
+    <authors>Maximus5</authors>
+    <owners>Maximus5</owners>
+    <tags>graphical console emulator tabs farmanager powershell cmd bash cygwin msys git</tags>
+    
+    <projectUrl>https://conemu.github.io/</projectUrl>
+    <iconUrl>https://conemu.github.io/img/logo-128.png</iconUrl>
+    <releaseNotes>https://conemu.github.io/en/Whats_New.html</releaseNotes>
+
+    <copyright>© 2020, Maksim Moisiuk</copyright>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <license type="expression">BSD-3-Clause</license>
+
+    <summary>
+      This is a console emulator control that embeds a fully functional console view in a Windows Forms window.
+    </summary>
+    <description>
+      This is a console emulator control that embeds a fully functional console view in a Windows Forms window.
+      It is capable of running any console application with full interactivity and advanced console functions.
+      Applications will detect it as an actual console and will not fall back to the output redirection mode with
+      reduced interactivity or formatting.
+    </description>
+    <dependencies>
+      <dependency id="ConEmu.Core" version="20.10.11" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="..\..\ConEmuWinForms\bin\ConEmu.WinForms.dll" target="lib\net40" />
+    <file src="..\..\ConEmuWinForms\bin\ConEmu.WinForms.Xml" target="lib\net40" />
+  </files>
+</package>
