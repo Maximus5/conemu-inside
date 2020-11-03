@@ -12,6 +12,18 @@ rem ??? what would be the path to Nuget.exe cmdline tool?..
 if exist "ConEmu.Control.WinForms.*.nupkg" del "ConEmu.Control.WinForms.*.nupkg"
 if exist "ConEmu.Control.WinForms\*.nupkg" del "ConEmu.Control.WinForms\*.nupkg"
 
+if not exist data mkdir data
+if not exist data\icon.png (
+  echo Downloading icon
+  ConEmuC -download https://conemu.github.io/img/logo-128.png data\icon.png 2> nul
+  if errorlevel 1 exit /b 1
+)
+if not exist data\license.txt (
+  echo Downloading license
+  ConEmuC -download https://github.com/Maximus5/ConEmu/raw/master/Release/ConEmu/License.txt data\license.txt 2> nul
+  if errorlevel 1 exit /b 1
+)
+
 cd /d ConEmu.Control.WinForms
 call nuget pack -Verbosity detailed -NoDefaultExcludes
 if errorlevel 1 (

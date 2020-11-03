@@ -9,12 +9,12 @@
     <tags>graphical console emulator tabs farmanager powershell cmd bash cygwin msys git</tags>
     
     <projectUrl>https://conemu.github.io/</projectUrl>
-    <iconUrl>https://conemu.github.io/img/logo-128.png</iconUrl>
+    <icon>images\icon.png</icon>
     <releaseNotes>https://conemu.github.io/en/Whats_New.html</releaseNotes>
 
     <copyright>© 2020, Maksim Moisiuk</copyright>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <license type="expression">BSD-3-Clause</license>
+    <license type="file">license\license.txt</license>
 
     <summary>
       This is a console emulator control that embeds a fully functional console view in a Windows Forms window.
@@ -32,5 +32,7 @@
   <files>
     <file src="..\..\ConEmuWinForms\bin\ConEmu.WinForms.dll" target="lib\net40" />
     <file src="..\..\ConEmuWinForms\bin\ConEmu.WinForms.Xml" target="lib\net40" />
+    <file src="..\data\icon.png" target="images\icon.png" />
+    <file src="..\data\license.txt" target="license\license.txt" />
   </files>
 </package>
