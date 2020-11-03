@@ -1,6 +1,6 @@
 ﻿namespace ConEmuInside
 {
-    partial class ChildTerminal
+    partial class TerminalStarter
     {
         /// <summary>
         /// Required designer variable.
@@ -28,9 +28,9 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.components = new System.ComponentModel.Container();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
             this.startPanel = new System.Windows.Forms.Panel();
+            this.argAutoClose = new System.Windows.Forms.CheckBox();
             this.argLog = new System.Windows.Forms.CheckBox();
             this.argDebug = new System.Windows.Forms.CheckBox();
             this.label4 = new System.Windows.Forms.Label();
@@ -47,18 +47,11 @@
             this.label2 = new System.Windows.Forms.Label();
             this.argConEmuExe = new System.Windows.Forms.TextBox();
             this.label1 = new System.Windows.Forms.Label();
-            this.termPanel = new System.Windows.Forms.Panel();
-            this.groupBox2 = new System.Windows.Forms.GroupBox();
-            this.macroBtn = new System.Windows.Forms.Button();
-            this.printBtn = new System.Windows.Forms.Button();
-            this.promptBox = new System.Windows.Forms.TextBox();
-            this.timer1 = new System.Windows.Forms.Timer(this.components);
             this.openFileDialog1 = new System.Windows.Forms.OpenFileDialog();
             this.folderBrowserDialog1 = new System.Windows.Forms.FolderBrowserDialog();
-            this.closeBtn = new System.Windows.Forms.Button();
+            this.argUseGuiMacro = new System.Windows.Forms.CheckBox();
             this.groupBox1.SuspendLayout();
             this.startPanel.SuspendLayout();
-            this.groupBox2.SuspendLayout();
             this.SuspendLayout();
             // 
             // groupBox1
@@ -67,19 +60,20 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.groupBox1.Controls.Add(this.startPanel);
-            this.groupBox1.Controls.Add(this.termPanel);
             this.groupBox1.Location = new System.Drawing.Point(12, 12);
             this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Size = new System.Drawing.Size(576, 355);
+            this.groupBox1.Size = new System.Drawing.Size(576, 332);
             this.groupBox1.TabIndex = 0;
             this.groupBox1.TabStop = false;
-            this.groupBox1.Text = "Terminal";
+            this.groupBox1.Text = "Terminal start parameters";
             // 
             // startPanel
             // 
             this.startPanel.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.startPanel.BackColor = System.Drawing.SystemColors.ButtonFace;
+            this.startPanel.Controls.Add(this.argUseGuiMacro);
+            this.startPanel.Controls.Add(this.argAutoClose);
             this.startPanel.Controls.Add(this.argLog);
             this.startPanel.Controls.Add(this.argDebug);
             this.startPanel.Controls.Add(this.label4);
@@ -98,14 +92,24 @@
             this.startPanel.Controls.Add(this.label1);
             this.startPanel.Location = new System.Drawing.Point(9, 17);
             this.startPanel.Name = "startPanel";
-            this.startPanel.Size = new System.Drawing.Size(558, 191);
+            this.startPanel.Size = new System.Drawing.Size(558, 309);
             this.startPanel.TabIndex = 0;
             this.startPanel.Text = "Start parameters";
+            // 
+            // argAutoClose
+            // 
+            this.argAutoClose.AutoSize = true;
+            this.argAutoClose.Location = new System.Drawing.Point(117, 197);
+            this.argAutoClose.Name = "argAutoClose";
+            this.argAutoClose.Size = new System.Drawing.Size(215, 17);
+            this.argAutoClose.TabIndex = 17;
+            this.argAutoClose.Text = "Close automatically after command ends";
+            this.argAutoClose.UseVisualStyleBackColor = true;
             // 
             // argLog
             // 
             this.argLog.AutoSize = true;
-            this.argLog.Location = new System.Drawing.Point(383, 128);
+            this.argLog.Location = new System.Drawing.Point(117, 174);
             this.argLog.Name = "argLog";
             this.argLog.Size = new System.Drawing.Size(108, 17);
             this.argLog.TabIndex = 16;
@@ -115,7 +119,7 @@
             // argDebug
             // 
             this.argDebug.AutoSize = true;
-            this.argDebug.Location = new System.Drawing.Point(256, 128);
+            this.argDebug.Location = new System.Drawing.Point(117, 151);
             this.argDebug.Name = "argDebug";
             this.argDebug.Size = new System.Drawing.Size(111, 17);
             this.argDebug.TabIndex = 15;
@@ -154,7 +158,7 @@
             // startBtn
             // 
             this.startBtn.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.startBtn.Location = new System.Drawing.Point(117, 151);
+            this.startBtn.Location = new System.Drawing.Point(117, 274);
             this.startBtn.Name = "startBtn";
             this.startBtn.Size = new System.Drawing.Size(169, 23);
             this.startBtn.TabIndex = 11;
@@ -264,69 +268,6 @@
             this.label1.TabIndex = 0;
             this.label1.Text = "ConEmu executable:";
             // 
-            // termPanel
-            // 
-            this.termPanel.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.termPanel.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(43)))), ((int)(((byte)(54)))));
-            this.termPanel.Location = new System.Drawing.Point(6, 19);
-            this.termPanel.Name = "termPanel";
-            this.termPanel.Size = new System.Drawing.Size(564, 330);
-            this.termPanel.TabIndex = 0;
-            // 
-            // groupBox2
-            // 
-            this.groupBox2.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.groupBox2.Controls.Add(this.closeBtn);
-            this.groupBox2.Controls.Add(this.macroBtn);
-            this.groupBox2.Controls.Add(this.printBtn);
-            this.groupBox2.Controls.Add(this.promptBox);
-            this.groupBox2.Location = new System.Drawing.Point(12, 373);
-            this.groupBox2.Name = "groupBox2";
-            this.groupBox2.Size = new System.Drawing.Size(576, 48);
-            this.groupBox2.TabIndex = 1;
-            this.groupBox2.TabStop = false;
-            this.groupBox2.Text = "Controlling box";
-            // 
-            // macroBtn
-            // 
-            this.macroBtn.Anchor = System.Windows.Forms.AnchorStyles.Right;
-            this.macroBtn.Location = new System.Drawing.Point(413, 17);
-            this.macroBtn.Name = "macroBtn";
-            this.macroBtn.Size = new System.Drawing.Size(75, 23);
-            this.macroBtn.TabIndex = 2;
-            this.macroBtn.Text = "Gui&Macro";
-            this.macroBtn.UseVisualStyleBackColor = true;
-            this.macroBtn.Click += new System.EventHandler(this.macroBtn_Click);
-            // 
-            // printBtn
-            // 
-            this.printBtn.Anchor = System.Windows.Forms.AnchorStyles.Right;
-            this.printBtn.Location = new System.Drawing.Point(332, 17);
-            this.printBtn.Name = "printBtn";
-            this.printBtn.Size = new System.Drawing.Size(75, 23);
-            this.printBtn.TabIndex = 1;
-            this.printBtn.Text = "&Print";
-            this.printBtn.UseVisualStyleBackColor = true;
-            this.printBtn.Click += new System.EventHandler(this.printBtn_Click);
-            // 
-            // promptBox
-            // 
-            this.promptBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.promptBox.Location = new System.Drawing.Point(6, 19);
-            this.promptBox.Name = "promptBox";
-            this.promptBox.Size = new System.Drawing.Size(316, 20);
-            this.promptBox.TabIndex = 0;
-            this.promptBox.Enter += new System.EventHandler(this.promptBox_Enter);
-            this.promptBox.KeyDown += new System.Windows.Forms.KeyEventHandler(this.promptBox_KeyDown);
-            this.promptBox.Leave += new System.EventHandler(this.promptBox_Leave);
-            // 
-            // timer1
-            // 
-            this.timer1.Tick += new System.EventHandler(this.timer1_Tick);
-            // 
             // openFileDialog1
             // 
             this.openFileDialog1.DefaultExt = "exe";
@@ -337,34 +278,32 @@
             // 
             this.folderBrowserDialog1.Description = "Choose working directory";
             // 
-            // closeBtn
+            // argUseGuiMacro
             // 
-            this.closeBtn.Anchor = System.Windows.Forms.AnchorStyles.Right;
-            this.closeBtn.Location = new System.Drawing.Point(495, 17);
-            this.closeBtn.Name = "closeBtn";
-            this.closeBtn.Size = new System.Drawing.Size(75, 23);
-            this.closeBtn.TabIndex = 3;
-            this.closeBtn.Text = "&Close";
-            this.closeBtn.UseVisualStyleBackColor = true;
-            this.closeBtn.Click += new System.EventHandler(this.closeBtn_Click);
+            this.argUseGuiMacro.AutoSize = true;
+            this.argUseGuiMacro.Checked = true;
+            this.argUseGuiMacro.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.argUseGuiMacro.Location = new System.Drawing.Point(117, 220);
+            this.argUseGuiMacro.Name = "argUseGuiMacro";
+            this.argUseGuiMacro.Size = new System.Drawing.Size(173, 17);
+            this.argUseGuiMacro.TabIndex = 18;
+            this.argUseGuiMacro.Text = "Use GuiMacro to run command";
+            this.argUseGuiMacro.UseVisualStyleBackColor = true;
             // 
-            // ChildTerminal
+            // TerminalStarter
             // 
             this.AcceptButton = this.startBtn;
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(600, 433);
-            this.Controls.Add(this.groupBox2);
+            this.ClientSize = new System.Drawing.Size(600, 356);
             this.Controls.Add(this.groupBox1);
             this.MinimumSize = new System.Drawing.Size(40, 39);
-            this.Name = "ChildTerminal";
+            this.Name = "TerminalStarter";
             this.Text = "ConEmu Inside";
-            this.Load += new System.EventHandler(this.ChildTerminal_Load);
+            this.Load += new System.EventHandler(this.TerminalStarter_Load);
             this.groupBox1.ResumeLayout(false);
             this.startPanel.ResumeLayout(false);
             this.startPanel.PerformLayout();
-            this.groupBox2.ResumeLayout(false);
-            this.groupBox2.PerformLayout();
             this.ResumeLayout(false);
 
         }
@@ -372,12 +311,6 @@
         #endregion
 
         private System.Windows.Forms.GroupBox groupBox1;
-        private System.Windows.Forms.Panel termPanel;
-        private System.Windows.Forms.GroupBox groupBox2;
-        private System.Windows.Forms.Button macroBtn;
-        private System.Windows.Forms.Button printBtn;
-        private System.Windows.Forms.TextBox promptBox;
-        private System.Windows.Forms.Timer timer1;
         private System.Windows.Forms.Panel startPanel;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.Button dirBtn;
@@ -397,7 +330,7 @@
         private System.Windows.Forms.TextBox argXmlFile;
         private System.Windows.Forms.CheckBox argLog;
         private System.Windows.Forms.CheckBox argDebug;
-        private System.Windows.Forms.Button closeBtn;
+        private System.Windows.Forms.CheckBox argAutoClose;
+        private System.Windows.Forms.CheckBox argUseGuiMacro;
     }
 }
-

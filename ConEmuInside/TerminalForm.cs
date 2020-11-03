@@ -9,27 +9,25 @@ namespace ConEmuInside
 {
     public partial class ChildTerminal : Form
     {
-        protected Process ConEmu;
-        protected GuiMacro guiMacro;
+        private Process conemu;
+        private GuiMacro guiMacro;
+        private readonly TerminalStarter starter;
+        private ConEmuStartArgs args;
 
-        public ChildTerminal()
+        internal ChildTerminal(TerminalStarter starter, ConEmuStartArgs args)
         {
+            this.starter = starter;
+            this.args = args;
             InitializeComponent();
         }
 
         private void ChildTerminal_Load(object sender, EventArgs e)
         {
-            string lsOurDir;
-            argConEmuExe.Text = GetConEmu();
-            argDirectory.Text = Directory.GetCurrentDirectory();
-            lsOurDir = Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-            argXmlFile.Text = Path.Combine(lsOurDir, "ConEmu.xml");
-            argCmdLine.Text = @"{cmd}"; // Use ConEmu's default {cmd} task
+            this.Left = this.starter.Left + 100;
+            this.Top = this.starter.Top + 100;
             RefreshControls(false);
-            // Force focus to ‘cmd line’ control
-            argCmdLine.Select();
-            //
             termPanel.Resize += new System.EventHandler(this.termPanel_Resize);
+            StartConEmu();
         }
 
         private void RefreshControls(bool bTermActive)
@@ -38,80 +36,36 @@ namespace ConEmuInside
             {
                 AcceptButton = null;
                 groupBox2.Enabled = true;
-                if (startPanel.Visible)
-                {
-                    promptBox.Focus();
-                    startPanel.Visible = false;
-                }
                 if (!termPanel.Visible)
                 {
                     termPanel.Visible = true;
                 }
+                if (!termPanel.Enabled)
+                {
+                    termPanel.Enabled = true;
+                }
             }
             else
             {
-                if (termPanel.Visible)
+                if (termPanel.Enabled)
                 {
-                    termPanel.Visible = false;
-                }
-                if (!startPanel.Visible)
-                {
-                    startPanel.Visible = true;
-                    argCmdLine.Focus();
+                    termPanel.Enabled = false;
                 }
                 groupBox2.Enabled = false;
-                AcceptButton = startBtn;
             }
-
-
+            starter.RefreshControls(bTermActive);
         }
 
-        private string GetConEmu()
-        {
-            string sOurDir = Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-            string[] sSearchIn = {
-              Directory.GetCurrentDirectory(),
-              sOurDir,
-              Path.Combine(sOurDir, ".."),
-              Path.Combine(sOurDir, "ConEmu"),
-              "%PATH%", "%REG%"
-              };
-
-            string[] sNames;
-            sNames = new string[] { "ConEmu.exe", "ConEmu64.exe" };
-
-            foreach (string sd in sSearchIn)
-            {
-                foreach (string sn in sNames)
-                {
-                    string spath;
-                    if (sd == "%PATH%" || sd == "%REG%")
-                    {
-                        spath = sn; //TODO
-                    }
-                    else
-                    {
-                        spath = Path.Combine(sd, sn);
-                    }
-                    if (File.Exists(spath))
-                        return spath;
-                }
-            }
-
-            // Default
-            return "ConEmu.exe";
-        }
-
-        private string GetConEmuExe()
+        internal string GetConEmuExe()
         {
             bool bExeLoaded = false;
             string lsConEmuExe = null;
 
-            while (!bExeLoaded && (ConEmu != null) && !ConEmu.HasExited)
+            while (!bExeLoaded && (conemu != null) && !conemu.HasExited)
             {
                 try
                 {
-                    lsConEmuExe = ConEmu.Modules[0].FileName;
+                    lsConEmuExe = conemu.Modules[0].FileName;
                     bExeLoaded = true;
                 }
                 catch (System.ComponentModel.Win32Exception)
@@ -124,7 +78,7 @@ namespace ConEmuInside
         }
 
         // Returns Path to "ConEmuCD[64].dll" (to GuiMacro execution)
-        private string GetConEmuCD()
+        internal string GetConEmuDll()
         {
             // Query real (full) path of started executable
             string lsConEmuExe = GetConEmuExe();
@@ -132,7 +86,7 @@ namespace ConEmuInside
                 return null;
 
             // Determine bitness of **our** process
-                string lsDll = (IntPtr.Size == 8) ? "ConEmuCD64.dll" : "ConEmuCD.dll";
+            string lsDll = (IntPtr.Size == 8) ? "ConEmuCD64.dll" : "ConEmuCD.dll";
 
             // Ready to find the library
             String lsExeDir, ConEmuCD;
@@ -146,19 +100,20 @@ namespace ConEmuInside
                     ConEmuCD = lsDll; // Must not get here actually
                 }
             }
+
             return ConEmuCD;
         }
 
         private void ExecuteGuiMacro(string asMacro)
         {
             // conemuc.exe -silent -guimacro:1234 print("\e","git"," --version","\n")
-            string ConEmuCD = GetConEmuCD();
-            if (ConEmuCD == null)
+            string conemuDll = GetConEmuDll();
+            if (conemuDll == null)
             {
                 throw new GuiMacroException("ConEmuCD must not be null");
             }
 
-            if (guiMacro != null && guiMacro.LibraryPath != ConEmuCD)
+            if (guiMacro != null && guiMacro.LibraryPath != conemuDll)
             {
                 guiMacro = null;
             }
@@ -166,8 +121,8 @@ namespace ConEmuInside
             try
             {
                 if (guiMacro == null)
-                    guiMacro = new GuiMacro(ConEmuCD);
-                guiMacro.Execute(ConEmu.Id.ToString(), asMacro,
+                    guiMacro = new GuiMacro(conemuDll);
+                guiMacro.Execute(conemu.Id.ToString(), asMacro,
                     (GuiMacro.GuiMacroResult code, string data) => {
                         Debugger.Log(0, "GuiMacroResult", "code=" + code.ToString() + "; data=" + data + "\n");
                     });
@@ -198,11 +153,12 @@ namespace ConEmuInside
 
         private void timer1_Tick(object sender, EventArgs e)
         {
-            if ((ConEmu != null) && ConEmu.HasExited)
+            if ((conemu != null) && conemu.HasExited)
             {
                 timer1.Stop();
-                ConEmu = null;
+                conemu = null;
                 RefreshControls(false);
+                Close();
             }
         }
 
@@ -230,69 +186,38 @@ namespace ConEmuInside
             //promptBox.Text = "...out...";
         }
 
-        private void exeBtn_Click(object sender, EventArgs e)
+        internal void StartConEmu()
         {
-            openFileDialog1.Title = "Choose ConEmu main executable";
-            openFileDialog1.FileName = argConEmuExe.Text;
-            if (openFileDialog1.ShowDialog() == DialogResult.OK)
+            RefreshControls(true);
+
+            var sRunAs = this.args.runAs ? " -cur_console:a" : "";
+
+            var sRunArgs = (this.args.debug ? " -debugw" : "") +
+                           " -NoKeyHooks" +
+                           " -InsideWnd 0x" + termPanel.Handle.ToString("X") +
+                           " -LoadCfgFile \"" + this.args.xmlFilePath + "\"" +
+                           " -Dir \"" + this.args.startupDirectory + "\"" +
+                           (this.args.log ? " -Log" : "") +
+                           (this.args.useGuiMacro ? " -detached" : " -run " + this.args.cmdLine + sRunAs);
+
+            if (this.args.useGuiMacro)
             {
-                argConEmuExe.Text = openFileDialog1.FileName;
+                promptBox.Text = "Shell(\"new_console\", \"\", \"" +
+                                 (this.args.cmdLine + sRunAs).Replace("\"", "\\\"") +
+                                 "\")";
             }
-            argConEmuExe.Focus();
-        }
 
-        private void cmdBtn_Click(object sender, EventArgs e)
-        {
-            openFileDialog1.Title = "Choose startup shell";
-            openFileDialog1.FileName = "";
-            if (openFileDialog1.ShowDialog() == DialogResult.OK)
+            try
             {
-                argCmdLine.Text = openFileDialog1.FileName;
-            }
-            argCmdLine.Focus();
-        }
-
-        private void dirBtn_Click(object sender, EventArgs e)
-        {
-            folderBrowserDialog1.SelectedPath = argDirectory.Text;
-            if (folderBrowserDialog1.ShowDialog() == DialogResult.OK)
-            {
-                argDirectory.Text = folderBrowserDialog1.SelectedPath;
-            }
-            argDirectory.Focus();
-        }
-
-        private void startBtn_Click(object sender, EventArgs e)
-        {
-            string sRunAs, sRunArgs;
-
-            // Show terminal panel, hide start options
-            //RefreshControls(true);
-
-            sRunAs = argRunAs.Checked ? " -cur_console:a" : "";
-
-            sRunArgs =
-                (argDebug.Checked ? " -debugw" : "") +
-                " -NoKeyHooks" +
-                " -InsideWnd 0x" + termPanel.Handle.ToString("X") +
-                " -LoadCfgFile \"" + argXmlFile.Text + "\"" +
-                " -Dir \"" + argDirectory.Text + "\"" +
-                (argLog.Checked ? " -Log" : "") +
-                " -detached"
-                //" -cmd " + // This one MUST be the last switch
-                //argCmdLine.Text + sRunAs // And the shell command line itself
-                ;
-
-            promptBox.Text = "Shell(\"new_console\", \"\", \"" + (argCmdLine.Text + sRunAs).Replace("\"", "\\\"") + "\")";
-
-            try {
                 // Start ConEmu
-                ConEmu = Process.Start(argConEmuExe.Text, sRunArgs);
-            } catch (System.ComponentModel.Win32Exception ex) {
+                conemu = Process.Start(this.args.conemuExePath, sRunArgs);
+            }
+            catch (System.ComponentModel.Win32Exception ex)
+            {
                 RefreshControls(false);
                 MessageBox.Show(ex.Message + "\r\n\r\n" +
-                    "Command:\r\n" + argConEmuExe.Text + "\r\n\r\n" +
-                    "Arguments:\r\n" + sRunArgs,
+                                "Command:\r\n" + this.args.conemuExePath + "\r\n\r\n" +
+                                "Arguments:\r\n" + sRunArgs,
                     ex.GetType().FullName + " (" + ex.NativeErrorCode.ToString() + ")",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
@@ -301,13 +226,12 @@ namespace ConEmuInside
             RefreshControls(true);
             // Start monitoring
             timer1.Start();
-            // Execute "startup" macro
-            macroBtn_Click(null, null);
-        }
 
-        private void startArgs_Enter(object sender, EventArgs e)
-        {
-            AcceptButton = startBtn;
+            // Execute "startup" macro
+            if (this.args.useGuiMacro)
+            {   
+                macroBtn_Click(null, null);
+            }
         }
 
         [DllImport("user32.dll", SetLastError = true)]
@@ -317,7 +241,7 @@ namespace ConEmuInside
 
         private void termPanel_Resize(object sender, EventArgs e)
         {
-            if (ConEmu != null)
+            if (conemu != null)
             {
                 IntPtr hConEmu = FindWindowEx(termPanel.Handle, (IntPtr)0, null, null);
                 if (hConEmu != (IntPtr)0)
@@ -330,6 +254,11 @@ namespace ConEmuInside
         private void closeBtn_Click(object sender, EventArgs e)
         {
             ExecuteGuiMacro("Close(2,1)");
+        }
+
+        private void ChildTerminal_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            starter.RefreshControls(false);
         }
     }
 }

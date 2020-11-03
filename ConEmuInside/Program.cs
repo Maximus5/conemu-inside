@@ -13,7 +13,7 @@ namespace ConEmuInside
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new ChildTerminal());
+            Application.Run(new TerminalStarter());
         }
     }
 }
