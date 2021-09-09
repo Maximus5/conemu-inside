@@ -22,8 +22,13 @@ if errorlevel 1 (
   exit /b 100
 )
 
-set BUILD_NO=20.10.11
+set BUILD_NO=21.9.5
 7z a ConEmuInside.%BUILD_NO%.7z *.exe *.dll ConEmu.xml *.config ConEmu\*
+if errorlevel 1 (
+  call cecho "Failed to create the 7zip package."
+  exit /b 100
+)
+7z a ConEmuInside.pdb.%BUILD_NO%.7z *.pdb
 if errorlevel 1 (
   call cecho "Failed to create the 7zip package."
   exit /b 100
