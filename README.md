@@ -2,7 +2,7 @@
 This is an example, how [ConEmu-Maximus5](https://conemu.github.io)
 may be embedded into third-party graphical applications.
 
-ConEmu build 151201 or higher is required.
+ConEmu build 210905 or higher is required.
 
 
 ## Screenshots
@@ -25,7 +25,7 @@ Solution `ConEmuInside.sln` contains several projects.
 ## License (BSD 3-clause)
 
     Copyright (c) 2020, Maksim Moisiuk <ConEmu.Maximus5@gmail.com>
-    
+
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions
     are met:
@@ -36,7 +36,7 @@ Solution `ConEmuInside.sln` contains several projects.
        documentation and/or other materials provided with the distribution.
     3. The name of the authors may not be used to endorse or promote products
        derived from this software without specific prior written permission.
-    
+
     THIS SOFTWARE IS PROVIDED BY THE AUTHOR ''AS IS'' AND ANY EXPRESS OR
     IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
     OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.

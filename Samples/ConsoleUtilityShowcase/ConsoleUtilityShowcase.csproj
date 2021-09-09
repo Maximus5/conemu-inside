@@ -41,21 +41,21 @@
     <Compile Include="Program.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\..\ConEmuWinForms\ConEmuWinForms.csproj">
       <Project>{1dc7d403-484b-43b4-b017-1356397a32cb}</Project>
       <Name>ConEmuWinForms</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Import Project="..\..\packages\ConEmu.Core.16.4.3.1\build\ConEmu.Core.Targets" Condition="Exists('..\..\packages\ConEmu.Core.16.4.3.1\build\ConEmu.Core.Targets')" />
+  <Import Project="..\..\packages\ConEmu.Core.21.9.5\build\ConEmu.Core.Targets" Condition="Exists('..\..\packages\ConEmu.Core.21.9.5\build\ConEmu.Core.Targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\..\packages\ConEmu.Core.16.4.3.1\build\ConEmu.Core.Targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\ConEmu.Core.16.4.3.1\build\ConEmu.Core.Targets'))" />
+    <Error Condition="!Exists('..\..\packages\ConEmu.Core.21.9.5\build\ConEmu.Core.Targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\ConEmu.Core.21.9.5\build\ConEmu.Core.Targets'))" />
   </Target>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

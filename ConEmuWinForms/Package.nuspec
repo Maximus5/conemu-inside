@@ -3,7 +3,7 @@
 	<metadata>
 		<id>ConEmu.Control.WinForms</id>
 		<!-- 1.0, because Nuget only upgrades automatically with the same first components, so probably shan't keep the date in them. -->
-		<version>1.20.10.11</version>
+		<version>1.21.9.5</version>
 		<title>ConEmu Console Emulator — Windows Forms Control Embedding</title>
 		<authors>Maximus5,hypersw</authors>
 		<owners>Maximus5,hypersw</owners>
@@ -12,7 +12,7 @@
 		<icon>images\icon.png</icon>
 		<releaseNotes>https://conemu.github.io/en/Whats_New.html</releaseNotes>
 
-		<copyright>© 2020, Maksim Moisiuk</copyright>
+		<copyright>© 2021, Maksim Moisiuk</copyright>
 		<requireLicenseAcceptance>false</requireLicenseAcceptance>
 		<license type="file">license\license.txt</license>
 
@@ -28,7 +28,7 @@
 
 		<dependencies>
 			<group targetFramework=".NETFramework4.0">
-				<dependency id="ConEmu.Core" version="[20.10.11,)" />
+				<dependency id="ConEmu.Core" version="[21.9.5,)" />
 			</group>
 		</dependencies>
 	</metadata>
