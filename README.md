@@ -24,7 +24,7 @@ Solution `ConEmuInside.sln` contains several projects.
 
 ## License (BSD 3-clause)
 
-    Copyright (c) 2020, Maksim Moisiuk <ConEmu.Maximus5@gmail.com>
+    Copyright (c) 2021, Maksim Moisiuk <ConEmu.Maximus5@gmail.com>
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions
